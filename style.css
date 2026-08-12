@@ -8,6 +8,25 @@
 body { font-family: system-ui, -apple-system, 'Hiragino Sans', 'Meiryo', sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; }
 input, select, button, textarea { font-family: inherit; }
 
+/* ── PIN lock ── */
+.pin-gate {
+  display: grid; place-items: center; min-height: 100vh; padding: 24px;
+  background: linear-gradient(135deg, #1a1a2e, #29405c);
+}
+.pin-card {
+  width: min(100%, 380px); padding: 32px 28px; background: #fff;
+  border-radius: 16px; box-shadow: 0 16px 44px rgba(0,0,0,.28); text-align: center;
+}
+.pin-icon { font-size: 38px; margin-bottom: 10px; }
+.pin-card h1 { font-size: 20px; margin-bottom: 8px; }
+.pin-card p { color: #666; font-size: 13px; line-height: 1.6; margin-bottom: 22px; }
+.pin-card label { display: block; text-align: left; font-size: 12px; font-weight: 700; color: #555; margin-bottom: 5px; }
+.pin-card input { width: 100%; padding: 12px; border: 1.5px solid #bbb; border-radius: 8px; font-size: 20px; letter-spacing: .22em; text-align: center; }
+.pin-card input:focus { outline: none; border-color: var(--blue); }
+.pin-error { color: var(--red) !important; margin: 8px 0 0 !important; }
+.pin-submit { width: 100%; margin-top: 18px; padding: 12px; border: 0; border-radius: 8px; color: #fff; background: var(--ink); font-size: 14px; font-weight: 700; cursor: pointer; }
+.pin-submit:hover { opacity: .88; }
+
 /* ── Toast ── */
 #toast {
   position: fixed; top: 16px; left: 50%; transform: translateX(-50%);

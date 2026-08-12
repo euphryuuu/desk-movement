@@ -9,59 +9,6 @@ let aiSheets = [];
 let dragSrc = null;
 
 // ══════════════════════════════════════
-// Firebase sync
-// ══════════════════════════════════════
-function syncToFB() {
-  if(isSyncing) return;
-  db.ref(DB_PATH).set({
-    rooms:     STATE.rooms,
-    stocks:    STATE.stocks,
-    aiPlan:    STATE.aiPlan,
-    layoutOld: STATE.layoutOld,
-    layoutNew: STATE.layoutNew,
-    updatedAt: Date.now()
-  });
-}
-
-let firstLoad = true;
-db.ref(DB_PATH).on("value", snap => {
-  if(isSyncing) return;
-  const data = snap.val();
-  setOnline(true);
-
-  if(!data) {
-    // DBが空 → 初期データをそのまま使いFirebaseに保存
-    if(firstLoad) {
-      firstLoad = false;
-      syncToFB();
-      renderAll();
-    }
-    return;
-  }
-
-  if(data.rooms)     STATE.rooms     = data.rooms;
-  if(data.stocks)    STATE.stocks    = data.stocks;
-  if(data.aiPlan !== undefined) STATE.aiPlan = data.aiPlan;
-  if(data.layoutOld) STATE.layoutOld = data.layoutOld;
-  if(data.layoutNew) STATE.layoutNew = data.layoutNew;
-
-  renderAll();
-  if(!firstLoad) showToast("🔄 データが更新されました");
-  firstLoad = false;
-});
-
-db.ref(".info/connected").on("value", snap => {
-  setOnline(snap.val() === true);
-});
-
-function saveAndSync() {
-  isSyncing = true;
-  syncToFB();
-  setTimeout(() => { isSyncing = false; }, 1000);
-  renderAll();
-}
-
-// ══════════════════════════════════════
 // Toast
 // ══════════════════════════════════════
 let toastTimer;
@@ -824,4 +771,48 @@ function resetAll(){
 // ══════════════════════════════════════
 // Init
 // ══════════════════════════════════════
-renderPanel(1);
+const PIN_SESSION_KEY = "desk-movement-pin-ok";
+
+function openApp() {
+  document.getElementById("pin-gate").hidden = true;
+  document.getElementById("app-shell").hidden = false;
+  setupAppControls();
+  startFirebaseSync();
+  renderPanel(1);
+}
+
+function setupAppControls() {
+  document.getElementById("import-button").addEventListener("click", () => {
+    document.getElementById("fileInput").click();
+  });
+  document.getElementById("reset-button").addEventListener("click", resetAll);
+  document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => goTab(Number(tab.dataset.tab)));
+  });
+}
+
+function setupPinGate() {
+  const form = document.getElementById("pin-form");
+  const input = document.getElementById("pin-input");
+  const error = document.getElementById("pin-error");
+
+  if (sessionStorage.getItem(PIN_SESSION_KEY) === "true") {
+    openApp();
+    return;
+  }
+
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    if (input.value === PIN_CODE) {
+      sessionStorage.setItem(PIN_SESSION_KEY, "true");
+      openApp();
+      return;
+    }
+    error.textContent = "PINコードが違います。";
+    error.hidden = false;
+    input.value = "";
+    input.focus();
+  });
+}
+
+setupPinGate();

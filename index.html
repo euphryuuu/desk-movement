@@ -9,7 +9,20 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
-  <div id="toast"></div>
+  <section id="pin-gate" class="pin-gate" aria-labelledby="pin-title">
+    <form id="pin-form" class="pin-card">
+      <div class="pin-icon" aria-hidden="true">🪑</div>
+      <h1 id="pin-title">机・椅子 移動計画ツール</h1>
+      <p>PINコードを入力してください。</p>
+      <label for="pin-input">PINコード</label>
+      <input id="pin-input" type="password" inputmode="numeric" autocomplete="current-password" pattern="[0-9]*" maxlength="12" required autofocus>
+      <p id="pin-error" class="pin-error" role="alert" hidden></p>
+      <button type="submit" class="pin-submit">入室する</button>
+    </form>
+  </section>
+
+  <div id="app-shell" hidden>
+    <div id="toast"></div>
 
   <div id="header">
     <div id="header-left">
@@ -18,20 +31,19 @@
     </div>
     <div id="header-btns">
       <input type="file" id="fileInput" accept=".json" hidden>
-      <button class="hbtn" onclick="document.getElementById('fileInput').click()">📂 読込</button>
-      <button class="hbtn green" onclick="exportJSON()">💾 保存</button>
-      <button class="hbtn" onclick="resetAll()">🗑</button>
+      <button class="hbtn" id="import-button">📂 読込</button>
+      <button class="hbtn" id="reset-button">🗑</button>
     </div>
   </div>
 
   <nav id="tabs" aria-label="作業手順">
-    <button class="tab active" data-tab="1" style="--active-color:#c0392b" onclick="goTab(1)"><span class="tab-num">1</span>教室・人数</button>
-    <button class="tab" data-tab="2" style="--active-color:#c0392b" onclick="goTab(2)"><span class="tab-num">2</span>在庫入力</button>
-    <button class="tab" data-tab="3" style="--active-color:#c0392b" onclick="goTab(3)"><span class="tab-num">3</span>配置表</button>
-    <button class="tab" data-tab="4" style="--active-color:#8e44ad" onclick="goTab(4)"><span class="tab-num">4</span>AI移動計画</button>
-    <button class="tab" data-tab="5" style="--active-color:#27ae60" onclick="goTab(5)"><span class="tab-num">5</span>掲示用紙</button>
-    <button class="tab" data-tab="6" style="--active-color:#e67e22" onclick="goTab(6)"><span class="tab-num">🗺</span>マップ</button>
-    <button class="tab" data-tab="7" style="--active-color:#16a085" onclick="goTab(7)"><span class="tab-num">📝</span>配置メモ</button>
+    <button class="tab active" data-tab="1" style="--active-color:#c0392b"><span class="tab-num">1</span>教室・人数</button>
+    <button class="tab" data-tab="2" style="--active-color:#c0392b"><span class="tab-num">2</span>在庫入力</button>
+    <button class="tab" data-tab="3" style="--active-color:#c0392b"><span class="tab-num">3</span>配置表</button>
+    <button class="tab" data-tab="4" style="--active-color:#8e44ad"><span class="tab-num">4</span>AI移動計画</button>
+    <button class="tab" data-tab="5" style="--active-color:#27ae60"><span class="tab-num">5</span>掲示用紙</button>
+    <button class="tab" data-tab="6" style="--active-color:#e67e22"><span class="tab-num">🗺</span>マップ</button>
+    <button class="tab" data-tab="7" style="--active-color:#16a085"><span class="tab-num">📝</span>配置メモ</button>
   </nav>
 
   <main id="main">
@@ -43,6 +55,7 @@
     <div id="panel-6" class="panel"></div>
     <div id="panel-7" class="panel"></div>
   </main>
+  </div>
 
   <script src="data.js"></script>
   <script src="firebase.js"></script>

@@ -14,10 +14,58 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const DB_PATH = "/plannerData";
 let isSyncing = false;
+let firebaseStarted = false;
+let firstLoad = true;
+let saveTimer;
 
 function setOnline(on) {
-  document.getElementById("syncDot").className = "sync-dot" + (on?" on":"");
-  document.getElementById("syncLabel").textContent = on ? "Firebase同期中" : "接続中...";
+  const dot = document.getElementById("syncDot");
+  const label = document.getElementById("syncLabel");
+  if (!dot || !label) return;
+  dot.className = "sync-dot" + (on ? " on" : "");
+  label.textContent = on ? "自動保存・同期中" : "接続中...";
+}
+
+function syncToFB() {
+  if (isSyncing || !firebaseStarted) return;
+  isSyncing = true;
+  return db.ref(DB_PATH).set({
+    rooms: STATE.rooms, stocks: STATE.stocks, aiPlan: STATE.aiPlan,
+    layoutOld: STATE.layoutOld, layoutNew: STATE.layoutNew, updatedAt: Date.now()
+  }).then(() => setOnline(true))
+    .catch(() => setOnline(false))
+    .finally(() => { isSyncing = false; });
+}
+
+function startFirebaseSync() {
+  if (firebaseStarted) return;
+  firebaseStarted = true;
+
+  db.ref(DB_PATH).on("value", snap => {
+    if (isSyncing) return;
+    const data = snap.val();
+    setOnline(true);
+    if (!data) {
+      if (firstLoad) { firstLoad = false; syncToFB(); renderAll(); }
+      return;
+    }
+    if (data.rooms) STATE.rooms = data.rooms;
+    if (data.stocks) STATE.stocks = data.stocks;
+    if (data.aiPlan !== undefined) STATE.aiPlan = data.aiPlan;
+    if (data.layoutOld) STATE.layoutOld = data.layoutOld;
+    if (data.layoutNew) STATE.layoutNew = data.layoutNew;
+    renderAll();
+    if (!firstLoad) showToast("🔄 データが更新されました");
+    firstLoad = false;
+  });
+
+  db.ref(".info/connected").on("value", snap => setOnline(snap.val() === true));
+}
+
+function saveAndSync() {
+  renderAll();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(syncToFB, 400);
 }
 
 // ══════════════════════════════════════
