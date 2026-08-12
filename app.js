@@ -662,35 +662,66 @@ function renderPanel5(){
 // ══════════════════════════════════════
 // Panel 6: マップ
 // ══════════════════════════════════════
+let mapNameMode = "nw";
+
+function moveMapRoom(sourceId, targetId) {
+  const sourceIndex = STATE.rooms.findIndex(room => room.id === sourceId);
+  const targetIndex = STATE.rooms.findIndex(room => room.id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+  [STATE.rooms[sourceIndex], STATE.rooms[targetIndex]] = [STATE.rooms[targetIndex], STATE.rooms[sourceIndex]];
+  saveAndSync();
+}
+
 function renderPanel6(){
   const p=document.getElementById("panel-6"); p.innerHTML="";
   const box=div("info-box orange");
-  box.innerHTML=`<h3 style="color:#e67e22">🗺 教室配置マップ</h3>`;
+  box.innerHTML=`<h3 style="color:#e67e22">🗺 教室配置マップ</h3><p>カードをドラッグして順番を変え、名称を直接編集できます。</p>`;
   p.appendChild(box);
 
-  const activeFloors=FLOORS.filter(f=>STATE.rooms.some(r=>r.floor===f));
-  activeFloors.forEach(floor=>{
-    const [fbg,fcol]=FLOOR_COLORS[floor]||["#eee","#666"];
-    const fr=STATE.rooms.filter(r=>r.floor===floor);
-    const grp=div("floor-group");
-    const hdr=div("floor-header"); hdr.style.cssText=`background:${fbg};color:${fcol};border-left-color:${fcol}`;
-    hdr.innerHTML=`<span>${floor}</span><span style="font-size:12px;opacity:0.7">${fr.length}教室</span>`;
-    const body=div(""); body.style.cssText=`border:1px solid ${fcol}44;border-top:none;border-radius:0 0 8px 8px;padding:10px;display:flex;flex-wrap:wrap;gap:8px`;
-
-    fr.forEach(r=>{
-      const tm=TYPES[r.type]||TYPES.normal;
-      const chip=div("map-room-chip");
-      chip.style.cssText=`background:${tm.bg};border-color:${tm.color}44`;
-      const name=div("name"); name.style.color=tm.color; name.textContent=r.old;
-      chip.appendChild(name);
-      if(r.old!==r.nw){const nw=div("nw"); nw.textContent="→"+r.nw; chip.appendChild(nw);}
-      if(r.type==="normal"&&r.students>0){const sub=div("sub"); sub.textContent=r.students+"人"; chip.appendChild(sub);}
-      if(r.type!=="normal"){const sub=div("sub"); sub.style.color=tm.color; sub.textContent=tm.label; chip.appendChild(sub);}
-      body.appendChild(chip);
-    });
-    grp.appendChild(hdr); grp.appendChild(body);
-    p.appendChild(grp);
+  const toolbar=div("map-toolbar");
+  toolbar.appendChild(h("span",{style:{fontSize:"12px",fontWeight:"700",color:"#555"}},"編集する名称："));
+  [["nw","来年度"],["old","現在"]].forEach(([mode,label])=>{
+    const button=h("button",{className:"map-toggle"+(mapNameMode===mode?" active":""),onClick:()=>{mapNameMode=mode;renderPanel6();}},label);
+    toolbar.appendChild(button);
   });
+  p.appendChild(toolbar);
+
+  const map=div("campus-map");
+  const makeBuilding=(title,floors,isNew=false)=>{
+    const building=div("school-building"+(isNew?" new-building":""));
+    building.appendChild(div("building-title",title));
+    floors.forEach(floor=>{
+      const floorEl=div("map-floor");
+      floorEl.appendChild(div("map-floor-label",floor.replace("本校","").replace("新校","") ));
+      const row=div("map-room-row");
+      const rooms=STATE.rooms.filter(room=>room.floor===floor);
+      if(!rooms.length) row.appendChild(div("map-drop-hint","教室なし"));
+      rooms.forEach(room=>{
+        const card=div("map-room-card "+room.type); card.draggable=true;
+        card.addEventListener("dragstart",()=>{dragSrc=room.id;});
+        card.addEventListener("dragover",event=>{event.preventDefault();card.classList.add("drag-over");});
+        card.addEventListener("dragleave",()=>card.classList.remove("drag-over"));
+        card.addEventListener("drop",event=>{event.preventDefault();card.classList.remove("drag-over");if(dragSrc!==null&&dragSrc!==room.id)moveMapRoom(dragSrc,room.id);dragSrc=null;});
+        card.addEventListener("dragend",()=>{dragSrc=null;card.classList.remove("drag-over");});
+        const input=h("input",{className:"map-room-input",type:"text",value:room[mapNameMode],draggable:"false",ariaLabel:"教室名"});
+        input.addEventListener("change",()=>{room[mapNameMode]=input.value.trim()||room[mapNameMode];saveAndSync();});
+        card.appendChild(input);
+        const meta=div("map-room-meta");
+        meta.textContent=room.type==="normal"?(room.students?room.students+"人":"通常教室"):(TYPES[room.type]||TYPES.normal).label;
+        card.appendChild(meta); row.appendChild(card);
+      });
+      floorEl.appendChild(row); building.appendChild(floorEl);
+    });
+    return building;
+  };
+  map.appendChild(makeBuilding("本校舎",["本校3F","本校2F","本校1F"]));
+  map.appendChild(div("bridge"));
+  map.appendChild(makeBuilding("新校舎",["新校2F","新校1F"],true));
+  p.appendChild(map);
+
+  const hint=div("info-box yellow");
+  hint.textContent="💡 並び替えは同じ階のカード同士で行えます。教室を別の階へ移す場合は、① 教室・人数タブで校舎・階を変更してください。";
+  hint.style.marginTop="14px"; p.appendChild(hint);
 }
 
 // ══════════════════════════════════════
