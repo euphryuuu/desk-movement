@@ -803,7 +803,8 @@ function setupPinGate() {
 
   form.addEventListener("submit", event => {
     event.preventDefault();
-    if (input.value === PIN_CODE) {
+    const enteredPin = input.value.trim().replace(/[^0-9]/g, "");
+    if (enteredPin === PIN_CODE) {
       sessionStorage.setItem(PIN_SESSION_KEY, "true");
       openApp();
       return;
