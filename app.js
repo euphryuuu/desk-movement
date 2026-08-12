@@ -194,8 +194,6 @@ function makeRoomCard(r, idx) {
 
   // Floor + Type selects
   const row1 = div("grid2"); row1.style.marginBottom="8px";
-  const d1=div(""); d1.appendChild(div("lbl")["textContent="+"校舎・階",d1]&&div("lbl"));
-
   // Floor select
   const flDiv = div(""); flDiv.appendChild(Object.assign(div("lbl"),{textContent:"校舎・階"}));
   const flSel = h("select",{className:"sel"});
