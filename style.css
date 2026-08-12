@@ -86,9 +86,9 @@ input, select, button, textarea { font-family: inherit; }
 .map-toolbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0 0 14px; }
 .map-toggle { border:1.5px solid #d6dee2; border-radius:999px; background:#fff; color:#61717a; padding:7px 12px; font-size:12px; font-weight:700; cursor:pointer; }
 .map-toggle.active { border-color:#e67e22; background:#e67e22; color:#fff; }
-.campus-map { display:grid; grid-template-columns:minmax(700px,1.7fr) minmax(340px,.8fr); gap:34px; align-items:end; padding:30px 20px 20px; border:1px solid #d3dce0; border-radius:14px; background:linear-gradient(#fafcfc,#f0f5f6); }
-.school-building { min-width:0; position:relative; padding:30px 15px 15px; border:2px solid #506b78; border-radius:4px; background:#fff; box-shadow:0 4px 0 rgba(28,62,80,.08); }
-.school-building.new-building { min-width:0; border-color:#8b6b49; }
+.campus-map { display:flex; gap:0; align-items:flex-end; padding:30px 20px 20px; border:1px solid #d3dce0; border-radius:14px; background:linear-gradient(#fafcfc,#f0f5f6); }
+.school-building { flex:1 1 0; min-width:0; position:relative; padding:30px 15px 15px; border:2px solid #506b78; border-radius:4px; background:#fff; box-shadow:0 4px 0 rgba(28,62,80,.08); }
+.school-building.new-building { flex:0 0 34%; min-width:0; border-color:#8b6b49; }
 .building-title { position:absolute; top:-14px; left:14px; padding:4px 10px; border-radius:4px; color:#fff; background:#506b78; font-size:12px; font-weight:800; letter-spacing:.06em; }
 .new-building .building-title { background:#8b6b49; }
 .map-floor { display:grid; grid-template-columns:54px 1fr; min-height:88px; border-top:1px solid #aebdc4; }
@@ -103,15 +103,8 @@ input, select, button, textarea { font-family: inherit; }
 .map-room-input { width:100%; border:0; outline:0; background:transparent; color:#263d49; font:700 13px/1.35 system-ui, sans-serif; text-align:center; }
 .map-room-meta { margin-top:4px; color:#71818a; font-size:9px; text-align:center; }
 .map-drop-hint { color:#7d8e96; font-size:11px; text-align:center; padding:12px; }
-.bridge { align-self:center; height:8px; margin:0 -28px; background:#8b6b49; border:2px solid #fff; border-radius:99px; z-index:2; }
-@media (min-width: 900px) {
-  #main { max-width: 1240px; padding:22px 28px; }
-  #tabs { gap:10px; padding:0 24px; }
-  .tab { flex-basis:112px; min-width:100px; font-size:12px; }
-  .tab-num { width:24px; height:24px; font-size:11px; }
-}
-
-@media (max-width: 900px) { .campus-map { overflow-x:auto; } }
+.bridge { flex:0 0 46px; align-self:center; height:8px; margin:0; background:#8b6b49; border:2px solid #fff; border-radius:99px; z-index:2; }
+@media (max-width: 900px) { .campus-map { min-width:1060px; } }
 
 /* ── Main container ── */
 #main { padding: 14px 12px; max-width: 640px; margin: 0 auto; }
@@ -256,6 +249,17 @@ input, select, button, textarea { font-family: inherit; }
   .poster-item { font-size: 14pt; }
   .poster-count { font-size: 18pt; }
   .poster-dest  { font-size: 13pt; }
+}
+
+/* PCでは全タブの作業領域を広く使う */
+@media (min-width: 900px) {
+  #main { max-width: 1400px; padding:22px 32px 36px; }
+  #tabs { gap:10px; padding:0 24px; }
+  .tab { flex-basis:112px; min-width:100px; font-size:12px; }
+  .tab-num { width:24px; height:24px; font-size:11px; }
+  .card { padding:18px; }
+  .grid2 { gap:14px; }
+  .grid4 { gap:10px; }
 }
 
 /* ── Sync indicator ── */
