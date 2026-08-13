@@ -392,15 +392,34 @@ function renderPanel2() {
 function renderPanel3() {
   const p=document.getElementById("panel-3"); p.innerHTML="";
 
+  const sumBySize = lines => (lines||[]).reduce((totals,line) => {
+    const size=line.size || "不明";
+    totals[size]=(totals[size]||0)+(Number(line.count)||0);
+    return totals;
+  },{});
+  const calculateBySize = (stockLines, needLines, discardLines=[]) => {
+    const stock=sumBySize(stockLines), need=sumBySize(needLines), discard=sumBySize(discardLines);
+    const sizes=new Set([...Object.keys(stock),...Object.keys(need),...Object.keys(discard)]);
+    const out=[], incoming=[];
+    sizes.forEach(size=>{
+      // 廃棄予定は、移動に使える在庫から先に除外する。
+      const available=Math.max(0,(stock[size]||0)-(discard[size]||0));
+      const required=need[size]||0;
+      if(available>required) out.push({size,count:available-required});
+      if(required>available) incoming.push({size,count:required-available});
+    });
+    return {out,incoming,outTotal:out.reduce((sum,line)=>sum+line.count,0),inTotal:incoming.reduce((sum,line)=>sum+line.count,0)};
+  };
+
   const results=STATE.rooms.map(r=>{
     const st=getStock(r.id);
-    const hd=st.deskLines.reduce((a,l)=>a+(l.count||0),0);
-    const hc=st.chairLines.reduce((a,l)=>a+(l.count||0),0);
-    const nd=r.type==="storage"?hd:(st.needDeskLines||[]).reduce((a,l)=>a+(l.count||0),0);
-    const nc=r.type==="storage"?hc:(st.needChairLines||[]).reduce((a,l)=>a+(l.count||0),0);
-    const dOut=Math.max(0,hd-nd),cOut=Math.max(0,hc-nc),dIn=Math.max(0,nd-hd),cIn=Math.max(0,nc-hc);
+    const desk=r.type==="storage"?{out:[],incoming:[],outTotal:0,inTotal:0}:calculateBySize(st.deskLines,st.needDeskLines,st.discardDeskLines);
+    const chair=r.type==="storage"?{out:[],incoming:[],outTotal:0,inTotal:0}:calculateBySize(st.chairLines,st.needChairLines,st.discardChairLines);
+    const dOut=desk.outTotal,cOut=chair.outTotal,dIn=desk.inTotal,cIn=chair.inTotal;
+    const nd=(st.needDeskLines||[]).reduce((a,l)=>a+(l.count||0),0);
+    const nc=(st.needChairLines||[]).reduce((a,l)=>a+(l.count||0),0);
     const w=(r.type==="normal"&&(nd>0||nc>0))?Math.max(2,Math.ceil((dOut+cOut+dIn+cIn)/8)):0;
-    return {r,dOut,cOut,dIn,cIn,w,nd,nc};
+    return {r,dOut,cOut,dIn,cIn,w,nd,nc,desk,chair};
   });
 
   // Summary
@@ -416,7 +435,7 @@ function renderPanel3() {
   });
   p.appendChild(sg);
 
-  results.forEach(({r,dOut,cOut,dIn,cIn,w,nd,nc})=>{
+  results.forEach(({r,dOut,cOut,dIn,cIn,w,nd,nc,desk,chair})=>{
     const [fbg,fcol]=FLOOR_COLORS[r.floor]||["#eee","#666"];
     const tm=TYPES[r.type]||TYPES.normal;
     const hasMove=dOut||cOut||dIn||cIn;
@@ -444,12 +463,14 @@ function renderPanel3() {
 
     if(r.type==="normal"){
       const g=div("grid4");
-      [{l:"机 搬出",v:dOut,c:"#c0392b"},{l:"椅子 搬出",v:cOut,c:"#c0392b"},{l:"机 不足",v:dIn,c:"#e67e22"},{l:"椅子 不足",v:cIn,c:"#e67e22"}].forEach(x=>{
+      const detail=lines=>lines.map(line=>`${line.size}号 ${line.count}台`).join("・");
+      [{l:"机 搬出",v:dOut,c:"#c0392b",detail:detail(desk.out)},{l:"椅子 搬出",v:cOut,c:"#c0392b",detail:detail(chair.out)},{l:"机 不足",v:dIn,c:"#e67e22",detail:detail(desk.incoming)},{l:"椅子 不足",v:cIn,c:"#e67e22",detail:detail(chair.incoming)}].forEach(x=>{
         const box=div(""); box.style.cssText="background:#f5f3ef;border-radius:6px;padding:7px 4px;text-align:center";
         const lbl=div(""); lbl.style.cssText="font-size:10px;color:#999;margin-bottom:2px"; lbl.textContent=x.l;
         const val=div(""); val.style.cssText=`font-size:15px;font-weight:700;color:${x.v>0?x.c:"#ccc"}`;
         val.textContent=x.v>0?x.v+"台":"−";
         box.appendChild(lbl); box.appendChild(val); g.appendChild(box);
+        if(x.detail){const d=div("");d.style.cssText=`font-size:9px;color:${x.c};margin-top:2px;line-height:1.3`;d.textContent=x.detail;box.appendChild(d);}
       });
       card.appendChild(g);
     }
