@@ -583,7 +583,38 @@ function renderPanel4() {
     const note=div("info-box yellow"); note.textContent="③の配置表画面からAI移動計画を作成してください。";
     p.appendChild(note);
   } else {
-    const content=div(""); content.style.cssText="background:#fff;border:1px solid #ddd;border-radius:10px;padding:16px;margin-bottom:16px";
+    const sheets=parseAIPlan(STATE.aiPlan);
+    const boardTitle=div(""); boardTitle.style.cssText="font-size:14px;font-weight:800;color:#59316e;margin:0 0 9px";
+    boardTitle.textContent="📦 作業の流れ"; p.appendChild(boardTitle);
+    const board=div("ai-board");
+    sheets.forEach(sheet=>{
+      if(!sheet.moves.length) return;
+      const card=div("ai-move-card");
+      const head=div("ai-move-card-head");
+      head.appendChild(h("strong",{},"出発："+sheet.name));
+      head.appendChild(span("ai-floor-label",sheet.floor));
+      card.appendChild(head);
+      sheet.moves.forEach(move=>{
+        const row=div("ai-move-row");
+        row.appendChild(span("ai-room-name",sheet.name));
+        row.appendChild(span("ai-flow-arrow","→"));
+        const load=div("ai-load "+(move.item==="机"?"desk":"chair"));
+        load.appendChild(span("",move.item));
+        load.appendChild(span("ai-load-size",move.size));
+        load.appendChild(span("ai-load-count",move.count+"台"));
+        row.appendChild(load);
+        row.appendChild(span("ai-flow-arrow","→"));
+        row.appendChild(span("ai-room-name ai-destination",move.dest));
+        card.appendChild(row);
+      });
+      board.appendChild(card);
+    });
+    if(board.childElementCount){ p.appendChild(board); }
+
+    const raw= h("details",{className:"ai-raw-plan"});
+    raw.open=true;
+    raw.appendChild(h("summary",{},"文章で移動計画を見る"));
+    const content=div("ai-raw-plan-content");
     STATE.aiPlan.split("\n").forEach(line=>{
       if(!line.trim()){const s=h("div",{}); s.style.height="8px"; content.appendChild(s); return;}
       const isH=/^(【|##|■|▼|●|###)/.test(line);
@@ -593,7 +624,7 @@ function renderPanel4() {
       el.textContent=line;
       content.appendChild(el);
     });
-    p.appendChild(content);
+    raw.appendChild(content); p.appendChild(raw);
   }
 
   const errEl=div(""); errEl.style.cssText="background:#fde8e8;border:1px solid #e0b0b0;border-radius:6px;padding:10px;color:#c0392b;font-size:13px;margin-bottom:10px;display:none";

@@ -220,6 +220,26 @@ input, select, button, textarea { font-family: inherit; }
 .ai-line.note    { font-size: 13px; color: var(--org); }
 .ai-line.normal  { font-size: 13px; }
 
+/* ── AI movement board ── */
+.ai-board { display:grid; grid-template-columns:repeat(auto-fit, minmax(330px, 1fr)); gap:14px; margin:0 0 18px; }
+.ai-move-card { overflow:hidden; border:1px solid #d8c3e7; border-radius:12px; background:#fff; box-shadow:0 2px 5px rgba(57,24,82,.06); }
+.ai-move-card-head { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 13px; background:#faf4ff; border-bottom:1px solid #eadcf3; }
+.ai-move-card-head strong { color:#59316e; font-size:14px; }
+.ai-floor-label { flex-shrink:0; color:#866599; font-size:11px; font-weight:700; }
+.ai-move-row { display:grid; grid-template-columns:minmax(78px,1fr) 28px minmax(124px,1.45fr) 28px minmax(78px,1fr); align-items:center; gap:4px; padding:11px 12px; }
+.ai-move-row + .ai-move-row { border-top:1px dashed #e4d9eb; }
+.ai-room-name { overflow:hidden; color:#344a59; font-size:12px; font-weight:800; line-height:1.35; text-overflow:ellipsis; white-space:nowrap; }
+.ai-destination { text-align:right; }
+.ai-flow-arrow { color:#9b77ad; font-size:19px; font-weight:700; text-align:center; }
+.ai-load { display:flex; align-items:center; justify-content:center; gap:5px; min-height:35px; padding:5px 7px; border-radius:7px; font-size:12px; font-weight:800; }
+.ai-load.desk { background:#fff0f0; color:#c0392b; }
+.ai-load.chair { background:#edf6ff; color:#2980b9; }
+.ai-load-size { white-space:nowrap; }
+.ai-load-count { padding-left:5px; border-left:1px solid currentColor; font-size:15px; }
+.ai-raw-plan { margin-top:8px; }
+.ai-raw-plan summary { color:#70517f; font-size:12px; font-weight:800; cursor:pointer; }
+.ai-raw-plan-content { margin-top:10px; padding:15px; border:1px solid #ddd; border-radius:10px; background:#fff; }
+
 /* ── Poster ── */
 .poster-card {
   border: 3px solid var(--ink); border-radius: 8px; padding: 16px;
@@ -278,6 +298,7 @@ input, select, button, textarea { font-family: inherit; }
     grid-column:1 / -1;
   }
   #panel-2 > .card, #panel-3 > .card { margin-bottom:0; }
+  .ai-board { grid-template-columns:repeat(2, minmax(0, 1fr)); }
 }
 
 /* ── Sync indicator ── */
