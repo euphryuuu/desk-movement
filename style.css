@@ -103,7 +103,8 @@ input, select, button, textarea { font-family: inherit; }
 .map-room-input { width:100%; border:0; outline:0; background:transparent; color:#263d49; font:700 13px/1.35 system-ui, sans-serif; text-align:center; }
 .map-room-meta { margin-top:4px; color:#71818a; font-size:9px; text-align:center; }
 .map-drop-hint { color:#7d8e96; font-size:11px; text-align:center; padding:12px; }
-.bridge { flex:0 0 46px; align-self:center; height:8px; margin:0; background:#8b6b49; border:2px solid #fff; border-radius:99px; z-index:2; }
+/* 渡り廊下の線はカードや枠線と重なりやすいため、PCマップでは非表示にする */
+.bridge { display:none; }
 @media (max-width: 900px) { .campus-map { min-width:1060px; } }
 
 /* ── Main container ── */
@@ -268,7 +269,7 @@ input, select, button, textarea { font-family: inherit; }
   }
   #panel-1 .floor-body .card { margin-bottom:0; }
 
-  #panel-2, #panel-3 {
+  .panel.active#panel-2, .panel.active#panel-3 {
     display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px;
     align-items:start;
   }
