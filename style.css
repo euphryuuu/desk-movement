@@ -260,6 +260,23 @@ input, select, button, textarea { font-family: inherit; }
   .card { padding:18px; }
   .grid2 { gap:14px; }
   .grid4 { gap:10px; }
+
+  /* カードが多い画面はPCで2列にして縦スクロールを減らす */
+  #panel-1 .floor-body {
+    display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px;
+    padding:14px;
+  }
+  #panel-1 .floor-body .card { margin-bottom:0; }
+
+  #panel-2, #panel-3 {
+    display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px;
+    align-items:start;
+  }
+  #panel-2 > .info-box, #panel-2 > .btn-row,
+  #panel-3 > .summary-grid, #panel-3 > .info-box, #panel-3 > .btn-row {
+    grid-column:1 / -1;
+  }
+  #panel-2 > .card, #panel-3 > .card { margin-bottom:0; }
 }
 
 /* ── Sync indicator ── */
