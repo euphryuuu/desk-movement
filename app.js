@@ -477,6 +477,8 @@ function renderPanel3() {
 // ══════════════════════════════════════
 // AI
 // ══════════════════════════════════════
+const AI_WORKER_URL = "https://desk-movement-ai.euph-ryunosuke555.workers.dev";
+
 async function runAI(btn, errEl) {
   btn.disabled=true; btn.textContent="⏳ AI計画を作成中...";
   if(errEl){errEl.style.display="none";}
@@ -499,8 +501,13 @@ async function runAI(btn, errEl) {
   const layoutSection=(STATE.layoutOld||STATE.layoutNew)?
     `\n【校内の位置関係】\n${STATE.layoutOld?`■ 現在の配置\n${STATE.layoutOld}\n`:""} ${STATE.layoutNew?`■ 来年度の配置\n${STATE.layoutNew}\n`:""}\n※ 位置関係を考慮し、廊下でつながる隣接教室同士で移動を完結させること。\n`:"";
 
+  const mapSection = `\n【マップ上の教室順（西→東）】\n${FLOORS.map(floor => {
+    const names = STATE.rooms.filter(room => room.floor === floor).map(room => room.old).join(" → ");
+    return `・${floor}：${names || "（登録なし）"}`;
+  }).join("\n")}\n※ 同じ階では、この順で隣り合う教室ほど近い。マップ上で隣接する教室同士を最優先すること。\n`;
+
   const prompt=`あなたは小学校の机・椅子の移動計画を立てる専門家です。以下の情報をもとに、具体的な移動計画を立ててください。
-${layoutSection}
+${layoutSection}${mapSection}
 【重要なルール】
 - なるべく同じ階・近い校舎の教室同士で移動を完結させる（階またぎは最小限に）
 - 各教室の指示は必ず以下の形式で書く（移動がない教室は省略）：
@@ -524,15 +531,16 @@ ${specialRooms.length>0?`【特別教室（移動対象外）】\n${specialRooms
 移動計画を日本語で出力してください。`;
 
   try {
-    const res=await fetch("https://api.anthropic.com/v1/messages",{
+    const res=await fetch(AI_WORKER_URL,{
       method:"POST",
-      headers:{"Content-Type":"application/json","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2000,messages:[{role:"user",content:prompt}]})
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({prompt})
     });
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data=await res.json();
-    if(data.error) throw new Error(data.error.message);
-    STATE.aiPlan=data.content.map(b=>b.text||"").join("");
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    if(data.error) throw new Error(data.error);
+    if(!data.text) throw new Error("AIから移動計画を取得できませんでした。");
+    STATE.aiPlan=data.text;
     saveAndSync();
     goTab(4);
   } catch(e) {
