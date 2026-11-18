@@ -2,13 +2,13 @@
 // Firebase
 // ══════════════════════════════════════
 const firebaseConfig = {
-  apiKey: "AIzaSyDkHRhfkNDLvqrGuPb5L9m3N8f8s1HVWM0",
-  authDomain: "school-desk-f3589.firebaseapp.com",
-  databaseURL: "https://school-desk-f3589-default-rtdb.firebaseio.com",
-  projectId: "school-desk-f3589",
-  storageBucket: "school-desk-f3589.firebasestorage.app",
-  messagingSenderId: "97046400522",
-  appId: "1:97046400522:web:4f8719c9f8fbd67520d9f3"
+  apiKey: "AIzaSyAssdxCSvrB4pUh_ProHyc61Lo-OYmY9EU",
+  authDomain: "desk-movement.firebaseapp.com",
+  databaseURL: "https://desk-movement-default-rtdb.firebaseio.com",
+  projectId: "desk-movement",
+  storageBucket: "desk-movement.firebasestorage.app",
+  messagingSenderId: "51282831774",
+  appId: "1:51282831774:web:f0965915ec3d9762150e8f"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();

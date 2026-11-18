@@ -4,7 +4,7 @@
 
 ## 端末間での共有
 
-アプリは既存の Firebase プロジェクトを参照します。管理者が Firebase コンソールから次の初期設定を行います。
+アプリは学校の Firebase プロジェクト `desk-movement` を参照します。管理者が Firebase コンソールから次の初期設定を行います。
 
 1. Authentication で「メール/パスワード」を有効にし、共有を許可する職員のアカウントを作成します。承認済みドメインに `euphryuuu.github.io` を登録します。
 2. Realtime Database で既存のルールを確認し、`database.rules.json` の `plannerData` ルールを反映します。他のパスのルールがある場合は残し、上位パスに広いアクセス許可がないことを確認します。
