@@ -337,7 +337,7 @@ input, select, button, textarea { font-family: inherit; }
 
 .room-management { display:grid; gap:12px; }
 .room-management-list { display:grid; gap:6px; }
-.room-management-row { display:grid; grid-template-columns:repeat(2,minmax(0,2fr)) minmax(0,1.25fr) repeat(2,minmax(0,1fr)); gap:8px; align-items:center; background:#fff; border:1px solid #cbdad5; border-radius:8px; padding:8px; }
+.room-management-row { display:grid; grid-template-columns:repeat(2,minmax(0,2fr)) minmax(0,1.25fr) repeat(2,minmax(0,1fr)) minmax(60px,auto); gap:8px; align-items:center; background:#fff; border:1px solid #cbdad5; border-radius:8px; padding:8px; }
 .room-management-row input, .room-management-row select { width:100%; min-width:0; }
 .room-management-row label > span { display:none; }
 .room-management-labels { background:#edf4f2; color:#234c46; font-size:12px; font-weight:700; }
@@ -349,3 +349,7 @@ input, select, button, textarea { font-family: inherit; }
   .room-management-labels { display:none; }
   .room-management-row label > span { display:block; font-size:11px; color:#234c46; margin-bottom:3px; }
 }
+
+.room-management-remove { justify-self:end; }
+.room-management-removed { background:#fbeeed; }
+.room-management-removed input, .room-management-removed select { opacity:.65; }

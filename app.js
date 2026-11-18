@@ -723,18 +723,17 @@ function renderPanel5(){
 }
 
 // ══════════════════════════════════════
-// Panel 6: マップ
+// Panel 6: 教室管理
 // ══════════════════════════════════════
 const BUILDINGS = [["本校", "本校舎"], ["新校", "新校舎"]];
 const STAIR_DIRECTIONS = {west:"西", north:"北", center:"中央", south:"南", east:"東"};
 let stairFloor = FLOORS[0];
 
 function schoolFloors() {
-  return [...new Set([...FLOORS, ...STATE.rooms.map(room => room.floor), ...Object.keys(STATE.stairs)])]
-    .sort((a, b) => {
-      const buildingIndex = floor => BUILDINGS.findIndex(([key]) => floor.startsWith(key));
-      return buildingIndex(a) - buildingIndex(b) || a.localeCompare(b, "ja", {numeric:true});
-    });
+  const floorNames = new Set([...FLOORS, ...STATE.rooms.map(room => room.floor), ...Object.keys(STATE.stairs)]);
+  const buildingIndex = floor => BUILDINGS.findIndex(([key]) => floor.startsWith(key));
+  return [...floorNames].sort((a, b) =>
+    buildingIndex(a) - buildingIndex(b) || a.localeCompare(b, "ja", {numeric:true}));
 }
 
 function eastOrder(room) {
@@ -776,7 +775,7 @@ function renderPanel6() {
   const list = div("room-management-list");
   const fields = ["現在の教室名", "次年度の教室名", "校舎", "階数", "東から何教室目"];
   list.appendChild(div("room-management-row room-management-labels",
-    ...fields.map(label => span("", label))));
+    ...fields.map(label => span("", label)), span("", "操作")));
   const rows = [];
 
   function appendRow(room) {
@@ -787,12 +786,26 @@ function renderPanel6() {
     const building = schoolSelect(BUILDINGS, buildingKey);
     const floor = h("input", {className:"inp", type:"number", min:"1", step:"1", required:"", value:existingFloor});
     const position = h("input", {className:"inp", type:"number", min:"1", step:"1", value:eastOrder(room || {}) ?? ""});
-    const row = div("room-management-row", ...[oldName, newName, building, floor, position].map((input, i) => {
+    const inputs = [oldName, newName, building, floor, position];
+    const row = div("room-management-row", ...inputs.map((input, i) => {
       input.setAttribute("aria-label", fields[i]);
       return h("label", {}, span("", fields[i]), input);
     }));
     const entry = {original:room && {...room}, oldName, newName, building, floor, position};
-    if (!room) {
+    if (room) {
+      const remove = h("button", {className:"btn ghost room-management-remove", type:"button",
+        "aria-label":`${room.old}を削除`}, "削除");
+      remove.addEventListener("click", () => {
+        entry.removed = !entry.removed;
+        form.dataset.dirty = "true";
+        error.textContent = "";
+        row.classList.toggle("room-management-removed", entry.removed);
+        inputs.forEach(input => { input.disabled = entry.removed; });
+        remove.textContent = entry.removed ? "取り消す" : "削除";
+        remove.setAttribute("aria-label", entry.removed ? `${room.old}の削除を取り消す` : `${room.old}を削除`);
+      });
+      row.appendChild(remove);
+    } else {
       row.appendChild(h("button", {className:"btn ghost room-management-cancel", type:"button", onClick:() => {
         rows.splice(rows.indexOf(entry), 1);
         row.remove();
@@ -816,8 +829,14 @@ function renderPanel6() {
     error.textContent = "";
     const draft = new Map(STATE.rooms.map(room => [room.id, {...room}]));
     const added = [];
+    const removed = new Set();
     for (const row of rows) {
       const {original, oldName, newName, building, floor, position} = row;
+      if (row.removed) {
+        draft.delete(original.id);
+        removed.add(original.id);
+        continue;
+      }
       const old = oldName.value.trim();
       if (!old || !Number.isSafeInteger(floor.valueAsNumber) ||
           (position.value && !Number.isSafeInteger(position.valueAsNumber))) {
@@ -854,8 +873,9 @@ function renderPanel6() {
       }
       positions.add(key);
     }
+    if (removed.size && !confirm(`${removed.size}教室を削除します。対象教室の人数や在庫情報も削除されます。よろしいですか？`)) return;
     STATE.rooms = next;
-    STATE.stocks.push(...added.map(room => mkStock(room.id)));
+    STATE.stocks = STATE.stocks.filter(stock => !removed.has(stock.id)).concat(added.map(room => mkStock(room.id)));
     saveAndSync();
     showToast("教室の変更をまとめて反映しました");
   });
@@ -868,7 +888,7 @@ function renderPanel6() {
     h("button", {className:"btn layout-save", type:"submit"}, "変更を保存")));
   panel.append(h("header", {className:"layout-heading"},
     h("h2", {}, "教室管理"),
-    h("p", {}, "校舎・階ごとに、最も東の教室を1として入力します。順番が未確認の教室は空欄にできます。")),
+    h("p", {}, "本校舎1階から順に表示します。各階のいちばん東を1とし、順番が未確認の教室は空欄にできます。")),
   form);
 }
 
