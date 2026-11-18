@@ -7,7 +7,6 @@ let STATE = {
   layoutOld:  INIT_LAYOUT_OLD,
   layoutNew:  INIT_LAYOUT_NEW,
 };
-let dragSrc = null;
 
 // ══════════════════════════════════════
 // Toast
@@ -155,40 +154,8 @@ function makeRoomCard(r, idx) {
   const tm = TYPES[r.type] || TYPES.normal;
 
   const card = div("card");
-  card.style.transition = "border 0.1s, background 0.1s";
-  card.setAttribute("draggable","true");
-  card.dataset.idx = idx;
-
-  card.addEventListener("dragstart", e => {
-    dragSrc = idx;
-    card.classList.add("drag-ghost");
-    e.dataTransfer.effectAllowed = "move";
-  });
-  card.addEventListener("dragover", e => {
-    e.preventDefault();
-    document.querySelectorAll(".card.drag-over").forEach(c => c.classList.remove("drag-over"));
-    card.classList.add("drag-over");
-  });
-  card.addEventListener("drop", e => {
-    e.preventDefault();
-    card.classList.remove("drag-over");
-    if(dragSrc === null || dragSrc === idx) return;
-    const [moved] = STATE.rooms.splice(dragSrc,1);
-    STATE.rooms.splice(idx,0,moved);
-    dragSrc = null;
-    saveAndSync();
-  });
-  card.addEventListener("dragend", () => {
-    dragSrc = null;
-    document.querySelectorAll(".card.drag-ghost,.card.drag-over").forEach(c => {
-      c.classList.remove("drag-ghost","drag-over");
-    });
-  });
-
   // Header row
   const hdr = div("card-header");
-  const dragHandle = span("","⠿"); dragHandle.style.cssText="font-size:18px;color:#ccc;cursor:grab";
-  hdr.appendChild(dragHandle);
   hdr.appendChild(badge(r.floor, fbg, fcol));
   hdr.appendChild(badge(tm.label, tm.bg, tm.color));
   card.appendChild(hdr);
@@ -278,28 +245,28 @@ function renderPanel1() {
   });
   p.appendChild(legend);
 
-  const hint = div(""); hint.style.cssText="font-size:11px;color:#aaa;text-align:center;margin-bottom:8px";
-  hint.textContent="⠿ をドラッグして並び替え可能"; p.appendChild(hint);
-
   const roomsContainer = div(""); p.appendChild(roomsContainer);
 
   function renderRooms() {
     roomsContainer.innerHTML="";
+    const floors = schoolFloors();
+    const rooms = orderedRooms(floors);
+    const cardForRoom = room => makeRoomCard(room, STATE.rooms.indexOf(room));
     if(groupState.byFloor) {
-      const activeFloors = schoolFloors().filter(f=>STATE.rooms.some(r=>r.floor===f));
+      const activeFloors = floors.filter(f=>rooms.some(r=>r.floor===f));
       activeFloors.forEach(floor=>{
         const [fbg,fcol]=FLOOR_COLORS[floor]||["#eee","#666"];
-        const fr=STATE.rooms.filter(r=>r.floor===floor);
+        const fr=rooms.filter(r=>r.floor===floor);
         const grp=div("floor-group");
         const hdr=div("floor-header"); hdr.style.cssText=`background:${fbg};color:${fcol};border-left-color:${fcol}`;
         hdr.append(h("span", {}, floor), h("span", {style:{fontSize:"12px",opacity:"0.7"}}, `${fr.length}教室`));
         const body=div("floor-body"); body.style.cssText=`border-color:${fcol}44`;
-        fr.forEach(r=>{ const idx=STATE.rooms.findIndex(x=>x.id===r.id); body.appendChild(makeRoomCard(r,idx)); });
+        fr.forEach(room=>body.appendChild(cardForRoom(room)));
         grp.appendChild(hdr); grp.appendChild(body);
         roomsContainer.appendChild(grp);
       });
     } else {
-      STATE.rooms.forEach((r,i)=>roomsContainer.appendChild(makeRoomCard(r,i)));
+      rooms.forEach(room=>roomsContainer.appendChild(cardForRoom(room)));
     }
   }
   renderRooms();
@@ -757,6 +724,11 @@ function eastOrder(room) {
   return Number.isSafeInteger(room.eastOrder) && room.eastOrder > 0 ? room.eastOrder : null;
 }
 
+function orderedRooms(floors = schoolFloors()) {
+  return [...STATE.rooms].sort((a, b) => floors.indexOf(a.floor) - floors.indexOf(b.floor) ||
+    (eastOrder(a) ?? Infinity) - (eastOrder(b) ?? Infinity));
+}
+
 const STAIR_TYPES = {none:"なし", up:"上り", down:"下り", both:"上り・下り", unknown:"方向未設定"};
 
 function stairType(value) {
@@ -842,9 +814,7 @@ function renderPanel6() {
     return oldName;
   }
 
-  const floors = schoolFloors();
-  [...STATE.rooms].sort((a, b) => floors.indexOf(a.floor) - floors.indexOf(b.floor) ||
-    (eastOrder(a) ?? Infinity) - (eastOrder(b) ?? Infinity)).forEach(appendRow);
+  orderedRooms().forEach(appendRow);
 
   form.addEventListener("input", () => {
     form.dataset.dirty = "true";
