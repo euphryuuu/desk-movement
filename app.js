@@ -935,37 +935,8 @@ function renderPanel7(){
 }
 
 // ══════════════════════════════════════
-// Export / Import / Reset
+// Reset
 // ══════════════════════════════════════
-function exportJSON(){
-  const data=JSON.stringify({...STATE,exportedAt:new Date().toISOString()},null,2);
-  const blob=new Blob([data],{type:"application/json"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url; a.download=`机椅子計画_${new Date().toLocaleDateString("ja-JP").replace(/\//g,"-")}.json`;
-  a.click(); URL.revokeObjectURL(url);
-  showToast("💾 データを保存しました");
-}
-
-document.getElementById("fileInput").addEventListener("change",e=>{
-  const file=e.target.files[0]; if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    try{
-      const d=JSON.parse(ev.target.result);
-      if(d.rooms)    STATE.rooms    =d.rooms;
-      if(d.stocks)   STATE.stocks   =d.stocks;
-      if(typeof d.aiPlan === "string") STATE.aiPlan = d.aiPlan;
-      STATE.stairs = d.stairs && typeof d.stairs === "object" ? d.stairs : {};
-      if(d.layoutOld)STATE.layoutOld=d.layoutOld;
-      if(d.layoutNew)STATE.layoutNew=d.layoutNew;
-      saveAndSync();
-      showToast("✅ データを読み込みました");
-    }catch{showToast("❌ 読み込みに失敗しました");}
-  };
-  reader.readAsText(file); e.target.value="";
-});
-
 function resetAll(){
   if(!confirm("全データをリセットしますか？\n（この操作は取り消せません）"))return;
   STATE.rooms    =JSON.parse(JSON.stringify(INIT_ROOMS));
@@ -993,10 +964,6 @@ function openApp() {
 }
 
 function setupAppControls() {
-  document.getElementById("import-button").addEventListener("click", () => {
-    document.getElementById("fileInput").click();
-  });
-  document.getElementById("export-button").addEventListener("click", exportJSON);
   document.getElementById("reset-button").addEventListener("click", resetAll);
   document.querySelectorAll(".tab").forEach(tab => {
     tab.addEventListener("click", () => goTab(Number(tab.dataset.tab)));
