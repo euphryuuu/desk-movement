@@ -14,7 +14,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const auth = firebase.auth();
 const sharedRef = db.ref("/plannerData");
-const stateKeys = ["rooms", "stocks", "aiPlan", "layoutOld", "layoutNew", "stairs"];
+const stateKeys = ["rooms", "stocks", "aiPlan", "aiPlanRooms", "layoutOld", "layoutNew", "stairs"];
 const localKey = "desk-movement-local-data";
 let defaults;
 let savedState;

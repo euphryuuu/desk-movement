@@ -2,11 +2,11 @@ let STATE = {
   rooms:      JSON.parse(JSON.stringify(INIT_ROOMS)),
   stocks:     INIT_ROOMS.map(r => mkStock(r.id)),
   aiPlan:     "",
+  aiPlanRooms: "",
   stairs:     {},
   layoutOld:  INIT_LAYOUT_OLD,
   layoutNew:  INIT_LAYOUT_NEW,
 };
-let aiSheets = [];
 let dragSrc = null;
 
 // ══════════════════════════════════════
@@ -221,8 +221,8 @@ function makeRoomCard(r, idx) {
     d.appendChild(lbl); d.appendChild(inp);
     return d;
   };
-  row2.appendChild(mkField("旧教室名（現在）", r.old, null, v=>{ STATE.rooms[idx].old=v; saveAndSync(); }));
-  row2.appendChild(mkField("新教室名（来年度）", r.nw, "#2980b9", v=>{ STATE.rooms[idx].nw=v; saveAndSync(); }));
+  row2.appendChild(mkField("旧教室", r.old, null, v=>{ STATE.rooms[idx].old=v; saveAndSync(); }));
+  row2.appendChild(mkField("新教室", r.nw, "#2980b9", v=>{ STATE.rooms[idx].nw=v; saveAndSync(); }));
   card.appendChild(row2);
 
   // Students + Teacher (normal only)
@@ -335,10 +335,10 @@ function renderPanel2() {
     const hdr=div("card-header");
     hdr.appendChild(badge(r.floor,fbg,fcol));
     hdr.appendChild(badge(tm.label,tm.bg,tm.color));
-    const nameSpan=h("span",{}); nameSpan.style.fontWeight="700"; nameSpan.textContent=r.old;
+    const nameSpan=h("span",{}); nameSpan.style.fontWeight="700"; nameSpan.textContent="旧教室 "+r.old;
     hdr.appendChild(nameSpan);
     hdr.appendChild(h("span",{style:{color:"#aaa",fontSize:"12px"}},"→"));
-    const nwSpan=h("span",{style:{fontWeight:"700",color:"#2980b9"}}); nwSpan.textContent=r.nw;
+    const nwSpan=h("span",{style:{fontWeight:"700",color:"#2980b9"}}); nwSpan.textContent="新教室 "+r.nw;
     hdr.appendChild(nwSpan);
     if(r.students>0){
       const stu=badge(r.students+"人","#e8f0fd","#2980b9"); stu.style.marginLeft="auto";
@@ -453,9 +453,9 @@ function renderPanel3() {
     const hdr=div("card-header");
     hdr.appendChild(badge(r.floor,fbg,fcol));
     hdr.appendChild(badge(tm.label,tm.bg,tm.color));
-    const ns=h("span",{style:{fontWeight:"700",fontSize:"14px"}}); ns.textContent=r.old; hdr.appendChild(ns);
+    const ns=h("span",{style:{fontWeight:"700",fontSize:"14px"}}); ns.textContent="旧教室 "+r.old; hdr.appendChild(ns);
     hdr.appendChild(h("span",{style:{color:"#aaa",fontSize:"12px"}},"→"));
-    const nws=h("span",{style:{fontWeight:"700",color:"#2980b9"}}); nws.textContent=r.nw; hdr.appendChild(nws);
+    const nws=h("span",{style:{fontWeight:"700",color:"#2980b9"}}); nws.textContent="新教室 "+r.nw; hdr.appendChild(nws);
     const statusEl=div(""); statusEl.style.cssText="display:flex;gap:6px;align-items:center;margin-left:auto";
     if(w>0){const wb=badge(w+"人","#1a1a2e","#fff");statusEl.appendChild(wb);}
     const sl=h("span",{style:{fontWeight:"700",fontSize:"13px",color:sc}}); sl.textContent=status; statusEl.appendChild(sl);
@@ -501,7 +501,20 @@ function renderPanel3() {
 // ══════════════════════════════════════
 const AI_WORKER_URL = "https://desk-movement-ai.euph-ryunosuke555.workers.dev";
 
+function roomPlanSignature(rooms = STATE.rooms) {
+  return JSON.stringify(rooms.map(room => [
+    String(room.id), room.old, room.nw, room.floor, eastOrder(room), room.type
+  ]).sort((a, b) => a[0].localeCompare(b[0])));
+}
+
+function planUsesOldRooms() {
+  return STATE.aiPlan && STATE.aiPlanRooms && STATE.aiPlanRooms !== roomPlanSignature();
+}
+
+const ROOM_PLAN_CHANGED = "教室情報が変更されました。最新の教室情報でAI移動計画を再生成してください。";
+
 async function runAI(btn, errEl) {
+  const planRooms = roomPlanSignature();
   btn.disabled=true; btn.textContent="⏳ AI計画を作成中...";
   if(errEl){errEl.style.display="none";}
 
@@ -526,7 +539,7 @@ async function runAI(btn, errEl) {
   const mapSection = `
 【教室管理・校内の位置】
 ${mapPrompt()}
-※ 同じ校舎・階で東からの順番が近い教室を優先する。未設定の順番は推測しない。階をまたぐ場合は登録済み階段を考慮し、接続が不明なら「経路要確認」と記載する。配置メモと登録済みの設定が異なる場合は、教室管理の登録済み順番を優先する。
+※ 同じ校舎・階で東からの順番が近い教室を優先する。未設定の順番は推測しない。階をまたぐ場合は登録済み階段を考慮し、接続が不明なら「経路要確認」と記載する。配置メモと登録済みの設定が異なる場合は、教室管理に登録された教室名・校舎・階・順番を優先する。
 `;
 
   const prompt=`あなたは小学校の机・椅子の移動計画を立てる専門家です。以下の情報をもとに、具体的な移動計画を立ててください。
@@ -534,10 +547,10 @@ ${layoutSection}${mapSection}
 【重要なルール】
 - なるべく同じ階・近い校舎の教室同士で移動を完結させる（階またぎは最小限に）
 - 各教室の指示は必ず以下の形式で書く（移動がない教室は省略）：
-  ### 【旧教室名（校舎・階）】
+  ### 【旧教室の名前（校舎・階）】
   ・机 ○号 ○台 → 旧△△ へ
   ・椅子 ○号 ○台 → 旧△△ へ
-- 教室名は必ず旧教室名（現在の名前）を使うこと。来年度の新教室名は絶対に使わない
+- 出発元と移動先は、旧教室として登録された名前をそのまま使うこと
 - 廃棄予定の机・椅子は移動計画に含めず最後に廃棄リストとしてまとめる
 - 保管室は出し入れ自由な在庫置き場。不足する教室には保管室から補充し、余りは保管室へ送る
 - 保管室でも解決できない不足は「要手配」と明記する
@@ -564,6 +577,7 @@ ${specialRooms.length>0?`【特別教室（移動対象外）】\n${specialRooms
     if(data.error) throw new Error(data.error);
     if(!data.text) throw new Error("AIから移動計画を取得できませんでした。");
     STATE.aiPlan=data.text;
+    STATE.aiPlanRooms=planRooms;
     saveAndSync();
     goTab(4);
   } catch(e) {
@@ -581,8 +595,9 @@ function renderPanel4() {
   box.innerHTML=`<h3 style="color:#8e44ad">🤖 AI 移動計画</h3><p style="color:#888;font-size:11px">※ AIの提案です。実際の状況に合わせてご確認ください。</p>`;
   p.appendChild(box);
 
-  if(!STATE.aiPlan){
-    const note=div("info-box yellow"); note.textContent="③の配置表画面からAI移動計画を作成してください。";
+  const outdated = planUsesOldRooms();
+  if(!STATE.aiPlan || outdated){
+    const note=div("info-box yellow"); note.textContent=outdated ? ROOM_PLAN_CHANGED : "③の配置表画面からAI移動計画を作成してください。";
     p.appendChild(note);
   } else {
     const sheets=parseAIPlan(STATE.aiPlan);
@@ -638,7 +653,7 @@ function renderPanel4() {
     const regenBtn=h("button",{className:"btn",style:{background:"#8e44ad",color:"#fff"}},"🔄 再生成する");
     regenBtn.addEventListener("click",()=>runAI(regenBtn,errEl));
     btnRow.appendChild(regenBtn);
-    btnRow.appendChild(h("button",{className:"btn",style:{background:"#27ae60",color:"#fff"},onClick:()=>{makeSheets();goTab(5);}},"📄 掲示用紙を作成 →"));
+    if (!outdated) btnRow.appendChild(h("button",{className:"btn",style:{background:"#27ae60",color:"#fff"},onClick:()=>goTab(5)},"📄 掲示用紙を作成 →"));
   }
   p.appendChild(btnRow);
 }
@@ -649,7 +664,7 @@ function renderPanel4() {
 function parseAIPlan(aiPlan){
   const lines=aiPlan.split("\n");
   const list=[];let cur=null;
-  const cleanDest=s=>s.replace(/\s*(?:教室)?\s*へ\s*[。]?$/,"").replace(/教室$/,"").trim();
+  const cleanDest=s=>s.replace(/\s*へ\s*[。]?$/,"").trim();
   lines.forEach(line=>{
     const stripped=line.replace(/^[#\s*\-]+/,"");
     const hm=stripped.match(/^【([^】（(→]+?)[（(]([^)）]+)[)）][^】]*】/);
@@ -665,18 +680,17 @@ function parseAIPlan(aiPlan){
   return list.filter(r=>r.moves.length>0||r.rawLines.some(l=>l.length>2));
 }
 
-function makeSheets(){ aiSheets=parseAIPlan(STATE.aiPlan); }
-
 function renderPanel5(){
   const p=document.getElementById("panel-5"); p.innerHTML="";
   const box=div("info-box green");
   box.innerHTML=`<h3 style="color:#27ae60">📄 教室掲示用紙</h3><p>各教室のドアに貼る用紙のプレビューです。</p>`;
   p.appendChild(box);
 
-  if(!aiSheets.length && STATE.aiPlan){ makeSheets(); }
+  const outdated = planUsesOldRooms();
+  const aiSheets = outdated ? [] : parseAIPlan(STATE.aiPlan);
 
   if(!aiSheets.length){
-    const note=div("info-box yellow"); note.textContent="AI移動計画から教室ごとの指示を読み取れませんでした。④のAI移動計画を確認してください。";
+    const note=div("info-box yellow"); note.textContent=outdated ? ROOM_PLAN_CHANGED : "AI移動計画から教室ごとの指示を読み取れませんでした。④のAI移動計画を確認してください。";
     p.appendChild(note);
   } else {
     const countEl=div(""); countEl.style.cssText="font-size:13px;color:#555;margin-bottom:12px";
@@ -713,13 +727,12 @@ function renderPanel5(){
 
   const btnRow=div("btn-row");
   btnRow.appendChild(h("button",{className:"btn",style:{background:"#888",color:"#fff"},onClick:()=>goTab(4)},"← AI計画に戻る"));
-  btnRow.appendChild(h("button",{className:"btn ghost",onClick:()=>{makeSheets();renderPanel5();}},"🔄 再読み込み"));
-  btnRow.appendChild(h("button",{className:"btn",style:{background:"#27ae60",color:"#fff"},onClick:()=>window.print()},"🖨 印刷・PDF保存"));
+  if (aiSheets.length) btnRow.appendChild(h("button",{className:"btn",style:{background:"#27ae60",color:"#fff"},onClick:()=>window.print()},"🖨 印刷・PDF保存"));
   p.appendChild(btnRow);
 
   const hint=div(""); hint.style.cssText="background:#f0f7f0;border-radius:8px;padding:10px 14px;font-size:12px;color:#555;margin-top:12px";
   hint.innerHTML="💡 「印刷・PDF保存」→ 印刷ダイアログで送信先を <strong>PDFに保存</strong> にするとPDFファイルになります。";
-  p.appendChild(hint);
+  if (aiSheets.length) p.appendChild(hint);
 }
 
 // ══════════════════════════════════════
@@ -773,7 +786,7 @@ function renderPanel6() {
   const form = h("form", {className:"room-management"});
   const error = h("p", {className:"room-management-error", role:"alert"});
   const list = div("room-management-list");
-  const fields = ["現在の教室名", "次年度の教室名", "校舎", "階数", "東から何教室目"];
+  const fields = ["旧教室", "新教室", "校舎", "階数", "東から何教室目"];
   list.appendChild(div("room-management-row room-management-labels",
     ...fields.map(label => span("", label)), span("", "操作")));
   const rows = [];
@@ -874,6 +887,10 @@ function renderPanel6() {
       positions.add(key);
     }
     if (removed.size && !confirm(`${removed.size}教室を削除します。対象教室の人数や在庫情報も削除されます。よろしいですか？`)) return;
+    if (STATE.aiPlan && !STATE.aiPlanRooms) {
+      const previous = roomPlanSignature();
+      if (previous !== roomPlanSignature(next)) STATE.aiPlanRooms = previous;
+    }
     STATE.rooms = next;
     STATE.stocks = STATE.stocks.filter(stock => !removed.has(stock.id)).concat(added.map(room => mkStock(room.id)));
     saveAndSync();
@@ -940,8 +957,8 @@ function renderPanel7(){
     return wrap;
   };
 
-  p.appendChild(mk("■ 現在の教室配置（旧・令和7年度）",STATE.layoutOld,"#333",v=>{STATE.layoutOld=v;saveAndSync();}));
-  p.appendChild(mk("■ 来年度の教室配置（新・令和8年度）",STATE.layoutNew,"#2980b9",v=>{STATE.layoutNew=v;saveAndSync();}));
+  p.appendChild(mk("■ 旧教室の配置メモ（令和7年度）",STATE.layoutOld,"#333",v=>{STATE.layoutOld=v;saveAndSync();}));
+  p.appendChild(mk("■ 新教室の配置メモ（令和8年度）",STATE.layoutNew,"#2980b9",v=>{STATE.layoutNew=v;saveAndSync();}));
 
   const hint=div(""); hint.style.cssText="background:#f0f7f0;border-radius:8px;padding:10px 14px;font-size:12px;color:#555;margin-bottom:16px";
   hint.textContent="💡 「西→東」「渡り廊下でつながる」など位置関係を入れるとAIの計画精度が上がります。";
@@ -964,7 +981,7 @@ function resetAll(){
   STATE.stairs   ={};
   STATE.layoutOld=INIT_LAYOUT_OLD;
   STATE.layoutNew=INIT_LAYOUT_NEW;
-  aiSheets=[];
+  STATE.aiPlanRooms="";
   saveAndSync();
   showToast("🗑 リセットしました");
 }
