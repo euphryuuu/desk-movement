@@ -1000,6 +1000,16 @@ function openApp() {
 }
 
 function setupAppControls() {
+  document.getElementById("save-button").addEventListener("click", () => {
+    const form = document.querySelector("#panel-6.active .room-management, #panel-7.active form[data-dirty]");
+    if (form) {
+      form.requestSubmit();
+      return;
+    }
+    const active = document.activeElement;
+    if (active?.matches(".panel.active input, .panel.active textarea, .panel.active select")) active.blur();
+    saveAndSync();
+  });
   document.getElementById("reset-button").addEventListener("click", resetAll);
   document.querySelectorAll(".tab").forEach(tab => {
     tab.addEventListener("click", () => goTab(Number(tab.dataset.tab)));
