@@ -222,7 +222,7 @@ function makeRoomCard(r, idx) {
     return d;
   };
   row2.appendChild(mkField("旧教室", r.old, null, v=>{ STATE.rooms[idx].old=v; saveAndSync(); }));
-  row2.appendChild(mkField("新教室", r.nw, "#2980b9", v=>{ STATE.rooms[idx].nw=v; saveAndSync(); }));
+  row2.appendChild(mkField("新教室", r.nw ?? "", "#2980b9", v=>{ STATE.rooms[idx].nw=v.trim(); saveAndSync(); }));
   card.appendChild(row2);
 
   // Students + Teacher (normal only)
@@ -308,7 +308,7 @@ function renderPanel1() {
   btnRow.appendChild(h("button",{className:"btn",style:{background:"#c0392b",color:"#fff"},onClick:()=>goTab(2)},"次へ：在庫入力 →"));
   btnRow.appendChild(h("button",{className:"btn ghost",onClick:()=>{
     const id=Date.now();
-    STATE.rooms.push({id,floor:"本校1F",old:"新教室",nw:"新教室",students:0,teacher:"",type:"normal"});
+    STATE.rooms.push({id,floor:"本校1F",old:"新教室",nw:"",students:0,teacher:"",type:"normal"});
     STATE.stocks.push(mkStock(id));
     saveAndSync();
   }},"＋ 教室追加"));
@@ -338,7 +338,7 @@ function renderPanel2() {
     const nameSpan=h("span",{}); nameSpan.style.fontWeight="700"; nameSpan.textContent="旧教室 "+r.old;
     hdr.appendChild(nameSpan);
     hdr.appendChild(h("span",{style:{color:"#aaa",fontSize:"12px"}},"→"));
-    const nwSpan=h("span",{style:{fontWeight:"700",color:"#2980b9"}}); nwSpan.textContent="新教室 "+r.nw;
+    const nwSpan=h("span",{style:{fontWeight:"700",color:"#2980b9"}}); nwSpan.textContent="新教室 "+(r.nw || "未設定");
     hdr.appendChild(nwSpan);
     if(r.students>0){
       const stu=badge(r.students+"人","#e8f0fd","#2980b9"); stu.style.marginLeft="auto";
@@ -455,7 +455,7 @@ function renderPanel3() {
     hdr.appendChild(badge(tm.label,tm.bg,tm.color));
     const ns=h("span",{style:{fontWeight:"700",fontSize:"14px"}}); ns.textContent="旧教室 "+r.old; hdr.appendChild(ns);
     hdr.appendChild(h("span",{style:{color:"#aaa",fontSize:"12px"}},"→"));
-    const nws=h("span",{style:{fontWeight:"700",color:"#2980b9"}}); nws.textContent="新教室 "+r.nw; hdr.appendChild(nws);
+    const nws=h("span",{style:{fontWeight:"700",color:"#2980b9"}}); nws.textContent="新教室 "+(r.nw || "未設定"); hdr.appendChild(nws);
     const statusEl=div(""); statusEl.style.cssText="display:flex;gap:6px;align-items:center;margin-left:auto";
     if(w>0){const wb=badge(w+"人","#1a1a2e","#fff");statusEl.appendChild(wb);}
     const sl=h("span",{style:{fontWeight:"700",fontSize:"13px",color:sc}}); sl.textContent=status; statusEl.appendChild(sl);
@@ -503,7 +503,7 @@ const AI_WORKER_URL = "https://desk-movement-ai.euph-ryunosuke555.workers.dev";
 
 function roomPlanSignature(rooms = STATE.rooms) {
   return JSON.stringify(rooms.map(room => [
-    String(room.id), room.old, room.nw, room.floor, eastOrder(room), room.type
+    String(room.id), room.old, room.nw ?? "", room.floor, eastOrder(room), room.type
   ]).sort((a, b) => a[0].localeCompare(b[0])));
 }
 
@@ -856,14 +856,14 @@ function renderPanel6() {
         error.textContent = "教室名を入力し、階数と順番は正の整数を指定してください。";
         return;
       }
-      const values = {old, nw:newName.value.trim() || old, floor:`${building.value}${floor.valueAsNumber}F`,
+      const values = {old, nw:newName.value.trim(), floor:`${building.value}${floor.valueAsNumber}F`,
         eastOrder:position.value ? position.valueAsNumber : null};
       if (!original) {
         added.push({id:crypto.randomUUID(), ...values, students:0, teacher:"", type:"normal"});
         continue;
       }
       const changes = Object.entries(values).filter(([key, value]) =>
-        (key === "eastOrder" ? eastOrder(original) : original[key]) !== value);
+        (key === "eastOrder" ? eastOrder(original) : original[key] ?? "") !== value);
       const current = draft.get(original.id);
       if (changes.length && !current) {
         error.textContent = `「${original.old}」は別の端末で削除されました。教室管理タブを開き直してください。`;
