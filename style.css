@@ -323,8 +323,9 @@ input, select, button, textarea { font-family: inherit; }
 .layout-editor { display:grid; align-content:start; gap:9px; padding:14px; min-width:0; background:#fff; border:1px solid #cbdad5; border-radius:10px; }
 .layout-editor h3 { color:#183c3a; font-size:16px; }
 .layout-editor .inp, .layout-editor .sel { width:100%; }
-.layout-actions, .layout-checks { display:flex; flex-wrap:wrap; gap:8px; }
-.layout-checks label { display:flex; align-items:center; gap:5px; padding:5px; font-size:13px; }
+.layout-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.stair-choices { display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:8px; }
+.stair-choices label { display:grid; gap:4px; font-size:13px; }
 .layout-save { justify-self:start; color:#fff; background:#1c6557; }
 @media (max-width:600px) {
   .layout-heading { align-items:start; flex-direction:column; gap:8px; }

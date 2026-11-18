@@ -502,16 +502,20 @@ function renderPanel3() {
 const AI_WORKER_URL = "https://desk-movement-ai.euph-ryunosuke555.workers.dev";
 
 function roomPlanSignature(rooms = STATE.rooms) {
-  return JSON.stringify(rooms.map(room => [
+  const roomData = JSON.stringify(rooms.map(room => [
     String(room.id), room.old, room.nw ?? "", room.floor, eastOrder(room), room.type
   ]).sort((a, b) => a[0].localeCompare(b[0])));
+  const floorData = Object.keys(STATE.stairs).sort().filter(floor =>
+    Object.keys(STAIR_DIRECTIONS).some(key => typeof STATE.stairs[floor]?.[key] === "string"))
+    .map(floor => [floor, mapStairsText(floor)]);
+  return floorData.length ? roomData + "\n" + JSON.stringify(floorData) : roomData;
 }
 
 function planUsesOldRooms() {
   return STATE.aiPlan && STATE.aiPlanRooms && STATE.aiPlanRooms !== roomPlanSignature();
 }
 
-const ROOM_PLAN_CHANGED = "教室情報が変更されました。最新の教室情報でAI移動計画を再生成してください。";
+const ROOM_PLAN_CHANGED = "教室または階段の情報が変更されました。最新の情報でAI移動計画を再生成してください。";
 
 async function runAI(btn, errEl) {
   const planRooms = roomPlanSignature();
@@ -539,7 +543,7 @@ async function runAI(btn, errEl) {
   const mapSection = `
 【教室管理・校内の位置】
 ${mapPrompt()}
-※ 同じ校舎・階で東からの順番が近い教室を優先する。未設定の順番は推測しない。階をまたぐ場合は登録済み階段を考慮し、接続が不明なら「経路要確認」と記載する。配置メモと登録済みの設定が異なる場合は、教室管理に登録された教室名・校舎・階・順番を優先する。
+※ 同じ校舎・階で東からの順番が近い教室を優先する。未設定の順番は推測しない。階をまたぐ場合は出発階と途中階で、上の階へ行くときは「上り」、下の階へ行くときは「下り」を選ぶ。「上り・下り」は両方に使える。「方向未設定」や階段同士の接続が不明な区間は「経路要確認」と記載し、階段の接続を推測しない。配置メモと登録済みの設定が異なる場合は、教室管理に登録された教室名・校舎・階・順番を優先する。
 `;
 
   const prompt=`あなたは小学校の机・椅子の移動計画を立てる専門家です。以下の情報をもとに、具体的な移動計画を立ててください。
@@ -753,11 +757,20 @@ function eastOrder(room) {
   return Number.isSafeInteger(room.eastOrder) && room.eastOrder > 0 ? room.eastOrder : null;
 }
 
+const STAIR_TYPES = {none:"なし", up:"上り", down:"下り", both:"上り・下り", unknown:"方向未設定"};
+
+function stairType(value) {
+  if (value === true) return "unknown";
+  return Object.hasOwn(STAIR_TYPES, value) ? value : "none";
+}
+
 function mapStairsText(floor) {
   const stairs = STATE.stairs[floor];
   if (!stairs?.configured) return "未設定";
-  return Object.entries(STAIR_DIRECTIONS).filter(([key]) => stairs[key])
-    .map(([, label]) => label).join("・") || "なし";
+  return Object.entries(STAIR_DIRECTIONS).map(([key, label]) => {
+    const type = stairType(stairs[key]);
+    return type === "none" ? "" : `${label}（${STAIR_TYPES[type]}）`;
+  }).filter(Boolean).join("、") || "なし";
 }
 
 function mapPrompt() {
@@ -917,22 +930,24 @@ function renderStairSettings() {
   });
   const form = h("form", {className:"layout-editor"},
     h("h3", {}, "階段の設定"), h("label", {}, "校舎・階", floor),
-    h("p", {}, "階段の位置を選びます。すべて外して保存すると「なし」になります。"));
-  const checks = div("layout-checks");
+    h("p", {}, "各位置で、この階から上の階へ進めるか、下の階へ進めるかを選びます。"));
+  const choices = div("stair-choices");
   for (const [key, label] of Object.entries(STAIR_DIRECTIONS)) {
-    const input = h("input", {type:"checkbox", name:key});
-    input.checked = Boolean(STATE.stairs[stairFloor]?.[key]);
-    checks.appendChild(h("label", {}, input, label));
+    const select = schoolSelect(Object.entries(STAIR_TYPES), stairType(STATE.stairs[stairFloor]?.[key]));
+    select.name = key;
+    choices.appendChild(h("label", {}, label, select));
   }
-  form.append(h("p", {}, "登録状況：" + mapStairsText(stairFloor)), checks,
+  form.append(h("p", {}, "登録状況：" + mapStairsText(stairFloor)), choices,
     h("button", {className:"btn layout-save", type:"submit"}, "階段を保存"));
   form.addEventListener("input", () => form.dataset.dirty = "true");
   form.addEventListener("submit", event => {
     event.preventDefault();
     const values = new FormData(form);
+    const previous = roomPlanSignature();
     STATE.stairs[stairFloor] = Object.fromEntries([
-      ["configured", true], ...Object.keys(STAIR_DIRECTIONS).map(key => [key, values.has(key)])
+      ["configured", true], ...Object.keys(STAIR_DIRECTIONS).map(key => [key, values.get(key)])
     ]);
+    if (STATE.aiPlan && !STATE.aiPlanRooms && previous !== roomPlanSignature()) STATE.aiPlanRooms = previous;
     saveAndSync();
     showToast("階段の設定を保存しました");
   });
