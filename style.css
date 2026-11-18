@@ -346,3 +346,12 @@ input, select, button, textarea { font-family: inherit; }
 #shared-dialog::backdrop { background:rgba(15,35,32,.52); }
 #shared-error { color:#a12020; }
 #shared-error:empty { display:none; }
+
+.layout-directions { margin:0; padding:0; border:0; min-width:0; }
+.layout-directions legend { margin-bottom:5px; font-size:13px; font-weight:700; }
+.layout-choices { display:flex; flex-wrap:wrap; gap:6px; }
+.layout-choices label { position:relative; cursor:pointer; }
+.layout-choices input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+.layout-choices span { display:grid; place-items:center; min-width:42px; min-height:44px; padding:4px 8px; color:#183c3a; background:#f8fbfa; border:1px solid #b5ccc5; border-radius:6px; font-size:13px; }
+.layout-choices input:checked + span { color:#fff; background:#1c6557; border-color:#1c6557; }
+.layout-choices input:focus-visible + span { outline:2px solid #1c6557; outline-offset:2px; }

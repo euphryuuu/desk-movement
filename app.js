@@ -773,7 +773,7 @@ function renderPanel6() {
     renderPanel6();
   });
   const heading = h("header", {className:"layout-heading"},
-    div("", h("h2", {}, "教室配置設定"), h("p", {}, "階を選び、教室と階段の位置を登録します。")),
+    div("", h("h2", {}, "教室配置設定"), h("p", {}, "既存の教室は、マップ上の教室名を押して方角を設定できます。")),
     h("label", {}, "校舎・階", floor));
   panel.appendChild(heading);
 
@@ -800,7 +800,7 @@ function renderPanel6() {
         onClick:() => {
           mapRoomId = room.id;
           renderPanel6();
-          document.getElementById("layout-current-name").focus();
+          document.querySelector("#layout-directions input:checked").focus();
         }
       }, room[mapNameMode]);
       tile.draggable = true;
@@ -828,9 +828,16 @@ function renderPanel6() {
   const oldName = h("input", {id:"layout-current-name", className:"inp", required:"", maxlength:"80", value:selected?.old || ""});
   const newName = h("input", {className:"inp", maxlength:"80", value:selected?.nw || ""});
   const roomFloor = mapSelect("教室の校舎・階", FLOORS.map(name => [name, name]), mapFloor);
-  const direction = mapSelect("方角", [["", "未設定"], ...Object.entries(MAP_DIRECTIONS)], selected?.direction || "");
+  const directions = h("fieldset", {id:"layout-directions", className:"layout-directions"}, h("legend", {}, "方角"));
+  const choices = div("layout-choices");
+  for (const key of ["north", "east", "south", "west", "center", ""]) {
+    const input = h("input", {type:"radio", name:"direction", value:key});
+    input.checked = key === (Object.hasOwn(MAP_DIRECTIONS, selected?.direction) ? selected.direction : "");
+    choices.appendChild(h("label", {}, input, h("span", {}, MAP_DIRECTIONS[key] || "未設定")));
+  }
+  directions.appendChild(choices);
   editor.append(h("label", {}, "現在の教室名", oldName), h("label", {}, "来年度の教室名", newName),
-    h("label", {}, "校舎・階", roomFloor), h("label", {}, "方角", direction),
+    h("label", {}, "校舎・階", roomFloor), directions,
     div("layout-actions", h("button", {className:"btn layout-save", type:"submit"}, "教室を保存"),
       selected ? h("button", {className:"btn ghost", type:"button", onClick:() => {
         mapRoomId = null;
@@ -853,7 +860,7 @@ function renderPanel6() {
       showToast("選んだ教室は別の端末で削除されました");
       return;
     }
-    const details = {old, nw:newName.value.trim() || old, floor:roomFloor.value, direction:direction.value};
+    const details = {old, nw:newName.value.trim() || old, floor:roomFloor.value, direction:new FormData(editor).get("direction")};
     if (room) {
       for (const key of Object.keys(details)) {
         const previous = key === "direction" ? selected.direction || "" : selected[key];
