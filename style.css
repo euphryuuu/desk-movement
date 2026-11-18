@@ -315,3 +315,34 @@ input, select, button, textarea { font-family: inherit; }
   .grid2 { grid-template-columns: 1fr; }
   .grid4 { grid-template-columns: 1fr 1fr; }
 }
+
+.layout-heading { display:flex; justify-content:space-between; align-items:end; gap:16px; margin:0 0 16px; }
+.layout-heading h2 { color:#183c3a; font-size:25px; margin:0 0 4px; }
+.layout-heading p, .layout-editor p { color:#536867; font-size:13px; line-height:1.6; }
+.layout-heading label, .layout-editor > label { display:grid; gap:5px; font-size:13px; font-weight:700; }
+.layout-heading label { min-width:130px; }
+.layout-grid { display:grid; gap:10px; grid-template-columns:repeat(3,minmax(0,1fr)); grid-template-areas:". north ." "west center east" ". south ." "unset unset unset"; padding:12px; background:#edf4f2; border:1px solid #cadaD5; border-radius:14px; }
+.zone-west { grid-area:west; }.zone-north { grid-area:north; }.zone-center { grid-area:center; }.zone-south { grid-area:south; }.zone-east { grid-area:east; }.zone-unset { grid-area:unset; }
+.layout-zone { background:#fff; border:1px solid #cbdad5; border-radius:9px; padding:8px; min-width:0; min-height:64px; }
+.layout-zone h3 { font-size:13px; color:#234c46; margin:0 0 6px; }
+.layout-zone p { color:#64746f; font-size:11px; margin:0; }
+.layout-stair-tag { display:inline-block; margin-left:4px; padding:2px 5px; border-radius:4px; color:#78440a; background:#fff0d7; font-size:10px; }
+.layout-room { margin:2px; padding:6px 8px; max-width:100%; overflow-wrap:anywhere; border:1px solid #b5ccc5; border-radius:6px; background:#f8fbfa; color:#183c3a; cursor:pointer; font:inherit; font-size:12px; }
+.layout-room[aria-pressed="true"] { background:#1c6557; border-color:#1c6557; color:#fff; }
+.layout-editors { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; }
+.layout-editor { display:grid; align-content:start; gap:9px; padding:14px; min-width:0; background:#fff; border:1px solid #cbdad5; border-radius:10px; }
+.layout-editor h3 { color:#183c3a; font-size:16px; }
+.layout-editor .inp, .layout-editor .sel { width:100%; }
+.layout-actions, .layout-checks { display:flex; flex-wrap:wrap; gap:8px; }
+.layout-checks label { display:flex; align-items:center; gap:5px; padding:5px; font-size:13px; }
+.layout-save { justify-self:start; color:#fff; background:#1c6557; }
+@media (max-width:600px) {
+  .layout-heading { align-items:start; flex-direction:column; gap:8px; }
+  .layout-editors { grid-template-columns:1fr; }
+  .layout-grid { gap:5px; padding:6px; }
+  .layout-zone { padding:5px; }
+}
+#shared-dialog { margin:auto; padding:0; width:min(92vw,440px); border:0; border-radius:10px; }
+#shared-dialog::backdrop { background:rgba(15,35,32,.52); }
+#shared-error { color:#a12020; }
+#shared-error:empty { display:none; }

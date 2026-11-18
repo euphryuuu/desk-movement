@@ -2,6 +2,7 @@ let STATE = {
   rooms:      JSON.parse(JSON.stringify(INIT_ROOMS)),
   stocks:     INIT_ROOMS.map(r => mkStock(r.id)),
   aiPlan:     "",
+  stairs:     {},
   layoutOld:  INIT_LAYOUT_OLD,
   layoutNew:  INIT_LAYOUT_NEW,
 };
@@ -291,7 +292,7 @@ function renderPanel1() {
         const fr=STATE.rooms.filter(r=>r.floor===floor);
         const grp=div("floor-group");
         const hdr=div("floor-header"); hdr.style.cssText=`background:${fbg};color:${fcol};border-left-color:${fcol}`;
-        hdr.innerHTML=`<span>${floor}</span><span style="font-size:12px;opacity:0.7">${fr.length}教室</span>`;
+        hdr.append(h("span", {}, floor), h("span", {style:{fontSize:"12px",opacity:"0.7"}}, `${fr.length}教室`));
         const body=div("floor-body"); body.style.cssText=`border-color:${fcol}44`;
         fr.forEach(r=>{ const idx=STATE.rooms.findIndex(x=>x.id===r.id); body.appendChild(makeRoomCard(r,idx)); });
         grp.appendChild(hdr); grp.appendChild(body);
@@ -522,10 +523,11 @@ async function runAI(btn, errEl) {
   const layoutSection=(STATE.layoutOld||STATE.layoutNew)?
     `\n【校内の位置関係】\n${STATE.layoutOld?`■ 現在の配置\n${STATE.layoutOld}\n`:""} ${STATE.layoutNew?`■ 来年度の配置\n${STATE.layoutNew}\n`:""}\n※ 位置関係を考慮し、廊下でつながる隣接教室同士で移動を完結させること。\n`:"";
 
-  const mapSection = `\n【マップ上の教室順（西→東）】\n${FLOORS.map(floor => {
-    const names = STATE.rooms.filter(room => room.floor === floor).map(room => room.old).join(" → ");
-    return `・${floor}：${names || "（登録なし）"}`;
-  }).join("\n")}\n※ 同じ階では、この順で隣り合う教室ほど近い。マップ上で隣接する教室同士を最優先すること。\n`;
+  const mapSection = `
+【教室配置設定】
+${mapPrompt()}
+※ 同じ区画と同じ階を優先する。階をまたぐ場合は登録済み階段を考慮し、接続が不明なら「経路要確認」と記載する。配置メモと登録済みの設定が異なる場合は、教室配置設定を優先する。
+`;
 
   const prompt=`あなたは小学校の机・椅子の移動計画を立てる専門家です。以下の情報をもとに、具体的な移動計画を立ててください。
 ${layoutSection}${mapSection}
@@ -684,7 +686,8 @@ function renderPanel5(){
     aiSheets.forEach(sh=>{
       const card=div("poster-card");
       const roomName=div("poster-room");
-      roomName.innerHTML=sh.name+(sh.floor?`<span style="font-size:12px;font-weight:400;color:#888;margin-left:8px">(${sh.floor})</span>`:"");
+      roomName.textContent=sh.name;
+      if(sh.floor) roomName.appendChild(h("span",{style:{fontSize:"12px",fontWeight:"400",color:"#888",marginLeft:"8px"}},`(${sh.floor})`));
       card.appendChild(roomName);
 
       if(sh.moves.length>0){
@@ -694,7 +697,7 @@ function renderPanel5(){
           const item=div("poster-item"); item.style.color=mv.item==="机"?"#c0392b":"#2980b9"; item.textContent=mv.item;
           const sz=h("span",{style:{fontSize:"16px",fontWeight:"700"}}); sz.textContent=mv.size;
           const cnt=div("poster-count"); cnt.textContent=mv.count+"台";
-          const dst=div("poster-dest"); dst.innerHTML=`→ <strong>${mv.dest}</strong> へ`;
+          const dst=div("poster-dest"); dst.append("→ ", h("strong", {}, mv.dest), " へ");
           row.appendChild(item); row.appendChild(sz); row.appendChild(cnt); row.appendChild(dst);
           card.appendChild(row);
         });
@@ -722,66 +725,176 @@ function renderPanel5(){
 // ══════════════════════════════════════
 // Panel 6: マップ
 // ══════════════════════════════════════
+const MAP_DIRECTIONS = {
+  west: "西", north: "北", center: "中央", south: "南", east: "東"
+};
+let mapFloor = FLOORS[0];
 let mapNameMode = "nw";
+let mapRoomId = null;
 
-function moveMapRoom(sourceId, targetId) {
-  const sourceIndex = STATE.rooms.findIndex(room => room.id === sourceId);
-  const targetIndex = STATE.rooms.findIndex(room => room.id === targetId);
-  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
-  [STATE.rooms[sourceIndex], STATE.rooms[targetIndex]] = [STATE.rooms[targetIndex], STATE.rooms[sourceIndex]];
-  saveAndSync();
+function mapStairsText(floor) {
+  const stairs = STATE.stairs[floor];
+  if (!stairs?.configured) return "未設定";
+  return Object.keys(MAP_DIRECTIONS).filter(key => stairs[key])
+    .map(key => MAP_DIRECTIONS[key]).join("・") || "なし";
 }
 
-function renderPanel6(){
-  const p=document.getElementById("panel-6"); p.innerHTML="";
-  const box=div("info-box orange");
-  box.innerHTML=`<h3 style="color:#e67e22">🗺 教室配置マップ</h3><p>カードをドラッグして順番を変え、名称を直接編集できます。</p>`;
-  p.appendChild(box);
+function mapPrompt() {
+  return FLOORS.map(floor => {
+    const rooms = STATE.rooms.filter(room => room.floor === floor);
+    const groups = [...Object.entries(MAP_DIRECTIONS), ["", "方角未設定"]];
+    const placements = groups.map(([key, label]) => {
+      const names = rooms.filter(room => (room.direction || "") === key)
+        .map(room => room.old).join(" → ");
+      return names ? `${label}：${names}` : "";
+    }).filter(Boolean);
+    return `・${floor}｜階段：${mapStairsText(floor)}｜${placements.join(" ／ ") || "教室なし"}`;
+  }).join("\n");
+}
 
-  const toolbar=div("map-toolbar");
-  toolbar.appendChild(h("span",{style:{fontSize:"12px",fontWeight:"700",color:"#555"}},"編集する名称："));
-  [["nw","来年度"],["old","現在"]].forEach(([mode,label])=>{
-    const button=h("button",{className:"map-toggle"+(mapNameMode===mode?" active":""),onClick:()=>{mapNameMode=mode;renderPanel6();}},label);
-    toolbar.appendChild(button);
+function mapSelect(label, options, value) {
+  const select = h("select", {className:"sel", "aria-label":label});
+  options.forEach(([key, name]) => select.appendChild(h("option", {value:key}, name)));
+  select.value = value;
+  return select;
+}
+
+function renderPanel6() {
+  const panel = document.getElementById("panel-6");
+  panel.replaceChildren();
+
+  const rooms = STATE.rooms.filter(room => room.floor === mapFloor);
+  const selectedRoom = rooms.find(room => room.id === mapRoomId);
+  const selected = selectedRoom && {...selectedRoom};
+  const floor = mapSelect("表示する校舎・階", FLOORS.map(name => [name, name]), mapFloor);
+  floor.addEventListener("change", () => {
+    mapFloor = floor.value;
+    mapRoomId = null;
+    renderPanel6();
   });
-  p.appendChild(toolbar);
+  const heading = h("header", {className:"layout-heading"},
+    div("", h("h2", {}, "教室配置設定"), h("p", {}, "階を選び、教室と階段の位置を登録します。")),
+    h("label", {}, "校舎・階", floor));
+  panel.appendChild(heading);
 
-  const map=div("campus-map");
-  const makeBuilding=(title,floors,isNew=false)=>{
-    const building=div("school-building"+(isNew?" new-building":""));
-    building.appendChild(div("building-title",title));
-    floors.forEach(floor=>{
-      const floorEl=div("map-floor");
-      floorEl.appendChild(div("map-floor-label",floor.replace("本校","").replace("新校","") ));
-      const row=div("map-room-row");
-      const rooms=STATE.rooms.filter(room=>room.floor===floor);
-      if(!rooms.length) row.appendChild(div("map-drop-hint","教室なし"));
-      rooms.forEach(room=>{
-        const card=div("map-room-card "+room.type); card.draggable=true;
-        card.addEventListener("dragstart",()=>{dragSrc=room.id;});
-        card.addEventListener("dragover",event=>{event.preventDefault();card.classList.add("drag-over");});
-        card.addEventListener("dragleave",()=>card.classList.remove("drag-over"));
-        card.addEventListener("drop",event=>{event.preventDefault();card.classList.remove("drag-over");if(dragSrc!==null&&dragSrc!==room.id)moveMapRoom(dragSrc,room.id);dragSrc=null;});
-        card.addEventListener("dragend",()=>{dragSrc=null;card.classList.remove("drag-over");});
-        const input=h("input",{className:"map-room-input",type:"text",value:room[mapNameMode],draggable:"false",ariaLabel:"教室名"});
-        input.addEventListener("change",()=>{room[mapNameMode]=input.value.trim()||room[mapNameMode];saveAndSync();});
-        card.appendChild(input);
-        const meta=div("map-room-meta");
-        meta.textContent=room.type==="normal"?(room.students?room.students+"人":"通常教室"):(TYPES[room.type]||TYPES.normal).label;
-        card.appendChild(meta); row.appendChild(card);
+  const toggles = div("map-toolbar");
+  [["old", "現在の教室名"], ["nw", "来年度の教室名"]].forEach(([key, name]) => {
+    toggles.appendChild(h("button", {
+      className:"map-toggle" + (mapNameMode === key ? " active" : ""),
+      "aria-pressed":String(mapNameMode === key),
+      onClick:() => { mapNameMode = key; renderPanel6(); }
+    }, name));
+  });
+  panel.appendChild(toggles);
+
+  const grid = div("layout-grid");
+  for (const [key, name] of [...Object.entries(MAP_DIRECTIONS), ["", "方角未設定"]]) {
+    const zone = h("section", {className:"layout-zone zone-" + (key || "unset")},
+      h("h3", {}, name, STATE.stairs[mapFloor]?.[key] ? span("layout-stair-tag", "階段") : null));
+    const matching = rooms.filter(room => (room.direction || "") === key);
+    if (!matching.length) zone.appendChild(h("p", {}, "教室なし"));
+    for (const room of matching) {
+      const tile = h("button", {
+        className:"layout-room",
+        "aria-pressed":String(room === selectedRoom),
+        onClick:() => {
+          mapRoomId = room.id;
+          renderPanel6();
+          document.getElementById("layout-current-name").focus();
+        }
+      }, room[mapNameMode]);
+      tile.draggable = true;
+      tile.addEventListener("dragstart", event => {
+        event.dataTransfer.setData("text/plain", String(room.id));
       });
-      floorEl.appendChild(row); building.appendChild(floorEl);
-    });
-    return building;
-  };
-  map.appendChild(makeBuilding("本校舎",["本校3F","本校2F","本校1F"]));
-  map.appendChild(div("bridge"));
-  map.appendChild(makeBuilding("新校舎",["新校2F","新校1F"],true));
-  p.appendChild(map);
+      tile.addEventListener("dragover", event => event.preventDefault());
+      tile.addEventListener("drop", event => {
+        event.preventDefault();
+        const source = matching.find(item => String(item.id) === event.dataTransfer.getData("text/plain"));
+        if (!source || source === room) return;
+        const from = STATE.rooms.indexOf(source);
+        const to = STATE.rooms.indexOf(room);
+        [STATE.rooms[from], STATE.rooms[to]] = [STATE.rooms[to], STATE.rooms[from]];
+        saveAndSync();
+      });
+      zone.appendChild(tile);
+    }
+    grid.appendChild(zone);
+  }
+  panel.appendChild(grid);
 
-  const hint=div("info-box yellow");
-  hint.textContent="💡 並び替えは同じ階のカード同士で行えます。教室を別の階へ移す場合は、① 教室・人数タブで校舎・階を変更してください。";
-  hint.style.marginTop="14px"; p.appendChild(hint);
+  const editors = div("layout-editors");
+  const editor = h("form", {className:"layout-editor"}, h("h3", {}, selected ? "教室を編集" : "教室を追加"));
+  const oldName = h("input", {id:"layout-current-name", className:"inp", required:"", maxlength:"80", value:selected?.old || ""});
+  const newName = h("input", {className:"inp", maxlength:"80", value:selected?.nw || ""});
+  const roomFloor = mapSelect("教室の校舎・階", FLOORS.map(name => [name, name]), mapFloor);
+  const direction = mapSelect("方角", [["", "未設定"], ...Object.entries(MAP_DIRECTIONS)], selected?.direction || "");
+  editor.append(h("label", {}, "現在の教室名", oldName), h("label", {}, "来年度の教室名", newName),
+    h("label", {}, "校舎・階", roomFloor), h("label", {}, "方角", direction),
+    div("layout-actions", h("button", {className:"btn layout-save", type:"submit"}, "教室を保存"),
+      selected ? h("button", {className:"btn ghost", type:"button", onClick:() => {
+        mapRoomId = null;
+        renderPanel6();
+        document.getElementById("layout-current-name").focus();
+      }}, "新しい教室を追加") : null));
+  oldName.addEventListener("input", () => oldName.setCustomValidity(""));
+  editor.addEventListener("submit", event => {
+    event.preventDefault();
+    const old = oldName.value.trim();
+    if (!old) {
+      oldName.setCustomValidity("教室名を入力してください。");
+      oldName.reportValidity();
+      return;
+    }
+    const room = STATE.rooms.find(item => item.id === mapRoomId);
+    if (selected && !room) {
+      mapRoomId = null;
+      renderPanel6();
+      showToast("選んだ教室は別の端末で削除されました");
+      return;
+    }
+    const details = {old, nw:newName.value.trim() || old, floor:roomFloor.value, direction:direction.value};
+    if (room) {
+      for (const key of Object.keys(details)) {
+        const previous = key === "direction" ? selected.direction || "" : selected[key];
+        if (details[key] !== previous) room[key] = details[key];
+      }
+    } else {
+      const id = crypto.randomUUID();
+      STATE.rooms.push({id, ...details, students:0, teacher:"", type:"normal"});
+      STATE.stocks.push(mkStock(id));
+      mapRoomId = id;
+    }
+    mapFloor = (room || details).floor;
+    saveAndSync();
+    showToast("教室の設定を保存しました");
+  });
+  editors.appendChild(editor);
+
+  const stairs = h("form", {className:"layout-editor"}, h("h3", {}, "階段の設定"),
+    h("p", {}, `${mapFloor}の階段の位置を選びます。すべて外して保存すると「なし」になります。`));
+  const checks = div("layout-checks");
+  for (const [key, name] of Object.entries(MAP_DIRECTIONS)) {
+    const input = h("input", {type:"checkbox", name:key});
+    input.checked = Boolean(STATE.stairs[mapFloor]?.[key]);
+    checks.appendChild(h("label", {}, input, name));
+  }
+  stairs.append(h("p", {className:"layout-stair-status"}, "登録状況：" + mapStairsText(mapFloor)),
+    checks, h("button", {className:"btn layout-save", type:"submit"}, "階段を保存"));
+  stairs.addEventListener("submit", event => {
+    event.preventDefault();
+    const values = new FormData(stairs);
+    STATE.stairs[mapFloor] = Object.fromEntries([
+      ["configured", true], ...Object.keys(MAP_DIRECTIONS).map(key => [key, values.has(key)])
+    ]);
+    saveAndSync();
+    showToast("階段の設定を保存しました");
+  });
+  for (const form of [editor, stairs]) {
+    form.addEventListener("input", () => form.dataset.dirty = "true");
+  }
+  editors.appendChild(stairs);
+  panel.appendChild(editors);
 }
 
 // ══════════════════════════════════════
@@ -835,7 +948,8 @@ document.getElementById("fileInput").addEventListener("change",e=>{
       const d=JSON.parse(ev.target.result);
       if(d.rooms)    STATE.rooms    =d.rooms;
       if(d.stocks)   STATE.stocks   =d.stocks;
-      if(d.aiPlan)   STATE.aiPlan   =d.aiPlan;
+      if(typeof d.aiPlan === "string") STATE.aiPlan = d.aiPlan;
+      STATE.stairs = d.stairs && typeof d.stairs === "object" ? d.stairs : {};
       if(d.layoutOld)STATE.layoutOld=d.layoutOld;
       if(d.layoutNew)STATE.layoutNew=d.layoutNew;
       saveAndSync();
@@ -850,6 +964,7 @@ function resetAll(){
   STATE.rooms    =JSON.parse(JSON.stringify(INIT_ROOMS));
   STATE.stocks   =INIT_ROOMS.map(r=>mkStock(r.id));
   STATE.aiPlan   ="";
+  STATE.stairs   ={};
   STATE.layoutOld=INIT_LAYOUT_OLD;
   STATE.layoutNew=INIT_LAYOUT_NEW;
   aiSheets=[];
@@ -874,6 +989,7 @@ function setupAppControls() {
   document.getElementById("import-button").addEventListener("click", () => {
     document.getElementById("fileInput").click();
   });
+  document.getElementById("export-button").addEventListener("click", exportJSON);
   document.getElementById("reset-button").addEventListener("click", resetAll);
   document.querySelectorAll(".tab").forEach(tab => {
     tab.addEventListener("click", () => goTab(Number(tab.dataset.tab)));

@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 </head>
 <body>
   <section id="pin-gate" class="pin-gate" aria-labelledby="pin-title">
@@ -34,7 +35,9 @@
     </div>
     <div id="header-btns">
       <input type="file" id="fileInput" accept=".json" hidden>
+      <button class="hbtn" id="shared-login">共有ログイン</button>
       <button class="hbtn" id="import-button">📂 読込</button>
+      <button class="hbtn" id="export-button">保存</button>
       <button class="hbtn" id="reset-button">🗑</button>
     </div>
   </div>
@@ -45,7 +48,7 @@
     <button class="tab" data-tab="3" style="--active-color:#c0392b"><span class="tab-num">3</span>配置表</button>
     <button class="tab" data-tab="4" style="--active-color:#8e44ad"><span class="tab-num">4</span>AI移動計画</button>
     <button class="tab" data-tab="5" style="--active-color:#27ae60"><span class="tab-num">5</span>掲示用紙</button>
-    <button class="tab" data-tab="6" style="--active-color:#e67e22"><span class="tab-num">🗺</span>マップ</button>
+    <button class="tab" data-tab="6" style="--active-color:#e67e22"><span class="tab-num">🗺</span>教室配置設定</button>
     <button class="tab" data-tab="7" style="--active-color:#16a085"><span class="tab-num">📝</span>配置メモ</button>
   </nav>
 
@@ -59,6 +62,20 @@
     <div id="panel-7" class="panel"></div>
   </main>
   </div>
+
+  <dialog id="shared-dialog" aria-labelledby="shared-title">
+    <form id="shared-form" class="layout-editor">
+      <h2 id="shared-title">共有ログイン</h2>
+      <p>学校の共有データに接続します。共有アカウントは管理者から発行されます。</p>
+      <label>メールアドレス<input class="inp" type="email" name="email" autocomplete="username" required></label>
+      <label>パスワード<input class="inp" type="password" name="password" autocomplete="current-password" required></label>
+      <p id="shared-error" role="alert"></p>
+      <div class="layout-actions">
+        <button type="submit" class="btn layout-save">ログイン</button>
+        <button type="button" id="shared-cancel" class="btn ghost">閉じる</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="data.js"></script>
   <script src="firebase.js"></script>

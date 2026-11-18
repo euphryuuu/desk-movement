@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "plannerData": {
+      ".read": "auth != null && root.child('plannerMembers').child(auth.uid).val() === true",
+      ".write": "auth != null && root.child('plannerMembers').child(auth.uid).val() === true"
+    }
+  }
+}
