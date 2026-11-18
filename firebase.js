@@ -124,7 +124,7 @@ function receiveSharedState(value) {
     data.rooms ||= [];
     data.stocks ||= [];
   }
-  const dirty = document.querySelector("#panel-6.active form[data-dirty]");
+  const dirty = document.querySelector(".panel.active form[data-dirty]");
   applyState(data);
   savedState = snapshotState();
   sharedReady = true;

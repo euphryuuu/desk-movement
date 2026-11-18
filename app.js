@@ -198,7 +198,7 @@ function makeRoomCard(r, idx) {
   // Floor select
   const flDiv = div(""); flDiv.appendChild(Object.assign(div("lbl"),{textContent:"校舎・階"}));
   const flSel = h("select",{className:"sel"});
-  FLOORS.forEach(f => { const o=h("option",{value:f},f); if(f===r.floor)o.selected=true; flSel.appendChild(o); });
+  schoolFloors().forEach(f => { const o=h("option",{value:f},f); if(f===r.floor)o.selected=true; flSel.appendChild(o); });
   flSel.addEventListener("change",()=>{ STATE.rooms[idx].floor=flSel.value; saveAndSync(); });
   flDiv.appendChild(flSel);
 
@@ -286,7 +286,7 @@ function renderPanel1() {
   function renderRooms() {
     roomsContainer.innerHTML="";
     if(groupState.byFloor) {
-      const activeFloors = FLOORS.filter(f=>STATE.rooms.some(r=>r.floor===f));
+      const activeFloors = schoolFloors().filter(f=>STATE.rooms.some(r=>r.floor===f));
       activeFloors.forEach(floor=>{
         const [fbg,fcol]=FLOOR_COLORS[floor]||["#eee","#666"];
         const fr=STATE.rooms.filter(r=>r.floor===floor);
@@ -524,9 +524,9 @@ async function runAI(btn, errEl) {
     `\n【校内の位置関係】\n${STATE.layoutOld?`■ 現在の配置\n${STATE.layoutOld}\n`:""} ${STATE.layoutNew?`■ 来年度の配置\n${STATE.layoutNew}\n`:""}\n※ 位置関係を考慮し、廊下でつながる隣接教室同士で移動を完結させること。\n`:"";
 
   const mapSection = `
-【教室配置設定】
+【教室管理・校内の位置】
 ${mapPrompt()}
-※ 同じ区画と同じ階を優先する。階をまたぐ場合は登録済み階段を考慮し、接続が不明なら「経路要確認」と記載する。配置メモと登録済みの設定が異なる場合は、教室配置設定を優先する。
+※ 同じ校舎・階で東からの順番が近い教室を優先する。未設定の順番は推測しない。階をまたぐ場合は登録済み階段を考慮し、接続が不明なら「経路要確認」と記載する。配置メモと登録済みの設定が異なる場合は、教室管理の登録済み順番を優先する。
 `;
 
   const prompt=`あなたは小学校の机・椅子の移動計画を立てる専門家です。以下の情報をもとに、具体的な移動計画を立ててください。
@@ -725,35 +725,43 @@ function renderPanel5(){
 // ══════════════════════════════════════
 // Panel 6: マップ
 // ══════════════════════════════════════
-const MAP_DIRECTIONS = {
-  west: "西", north: "北", center: "中央", south: "南", east: "東"
-};
-let mapFloor = FLOORS[0];
-let mapNameMode = "nw";
-let mapRoomId = null;
+const BUILDINGS = [["本校", "本校舎"], ["新校", "新校舎"]];
+const STAIR_DIRECTIONS = {west:"西", north:"北", center:"中央", south:"南", east:"東"};
+let stairFloor = FLOORS[0];
+
+function schoolFloors() {
+  return [...new Set([...FLOORS, ...STATE.rooms.map(room => room.floor), ...Object.keys(STATE.stairs)])]
+    .sort((a, b) => {
+      const buildingIndex = floor => BUILDINGS.findIndex(([key]) => floor.startsWith(key));
+      return buildingIndex(a) - buildingIndex(b) || a.localeCompare(b, "ja", {numeric:true});
+    });
+}
+
+function eastOrder(room) {
+  return Number.isSafeInteger(room.eastOrder) && room.eastOrder > 0 ? room.eastOrder : null;
+}
 
 function mapStairsText(floor) {
   const stairs = STATE.stairs[floor];
   if (!stairs?.configured) return "未設定";
-  return Object.keys(MAP_DIRECTIONS).filter(key => stairs[key])
-    .map(key => MAP_DIRECTIONS[key]).join("・") || "なし";
+  return Object.entries(STAIR_DIRECTIONS).filter(([key]) => stairs[key])
+    .map(([, label]) => label).join("・") || "なし";
 }
 
 function mapPrompt() {
-  return FLOORS.map(floor => {
-    const rooms = STATE.rooms.filter(room => room.floor === floor);
-    const groups = [...Object.entries(MAP_DIRECTIONS), ["", "方角未設定"]];
-    const placements = groups.map(([key, label]) => {
-      const names = rooms.filter(room => (room.direction || "") === key)
-        .map(room => room.old).join(" → ");
-      return names ? `${label}：${names}` : "";
-    }).filter(Boolean);
+  return schoolFloors().map(floor => {
+    const rooms = STATE.rooms.filter(room => room.floor === floor)
+      .sort((a, b) => (eastOrder(a) ?? Infinity) - (eastOrder(b) ?? Infinity));
+    const placements = rooms.map(room => {
+      const order = eastOrder(room);
+      return order ? `東から${order}教室目：${room.old}` : `順番未設定：${room.old}`;
+    });
     return `・${floor}｜階段：${mapStairsText(floor)}｜${placements.join(" ／ ") || "教室なし"}`;
   }).join("\n");
 }
 
-function mapSelect(label, options, value) {
-  const select = h("select", {className:"sel", "aria-label":label});
+function schoolSelect(options, value) {
+  const select = h("select", {className:"sel"});
   options.forEach(([key, name]) => select.appendChild(h("option", {value:key}, name)));
   select.value = value;
   return select;
@@ -763,145 +771,135 @@ function renderPanel6() {
   const panel = document.getElementById("panel-6");
   panel.replaceChildren();
 
-  const rooms = STATE.rooms.filter(room => room.floor === mapFloor);
-  const selectedRoom = rooms.find(room => room.id === mapRoomId);
-  const selected = selectedRoom && {...selectedRoom};
-  const floor = mapSelect("表示する校舎・階", FLOORS.map(name => [name, name]), mapFloor);
-  floor.addEventListener("change", () => {
-    mapFloor = floor.value;
-    mapRoomId = null;
-    renderPanel6();
-  });
-  const heading = h("header", {className:"layout-heading"},
-    div("", h("h2", {}, "教室配置設定"), h("p", {}, "既存の教室は、マップ上の教室名を押して方角を設定できます。")),
-    h("label", {}, "校舎・階", floor));
-  panel.appendChild(heading);
+  const form = h("form", {className:"room-management"});
+  const error = h("p", {className:"room-management-error", role:"alert"});
+  const list = div("room-management-list");
+  const fields = ["現在の教室名", "次年度の教室名", "校舎", "階数", "東から何教室目"];
+  list.appendChild(div("room-management-row room-management-labels",
+    ...fields.map(label => span("", label))));
+  const rows = [];
 
-  const toggles = div("map-toolbar");
-  [["old", "現在の教室名"], ["nw", "来年度の教室名"]].forEach(([key, name]) => {
-    toggles.appendChild(h("button", {
-      className:"map-toggle" + (mapNameMode === key ? " active" : ""),
-      "aria-pressed":String(mapNameMode === key),
-      onClick:() => { mapNameMode = key; renderPanel6(); }
-    }, name));
-  });
-  panel.appendChild(toggles);
-
-  const grid = div("layout-grid");
-  for (const [key, name] of [...Object.entries(MAP_DIRECTIONS), ["", "方角未設定"]]) {
-    const zone = h("section", {className:"layout-zone zone-" + (key || "unset")},
-      h("h3", {}, name, STATE.stairs[mapFloor]?.[key] ? span("layout-stair-tag", "階段") : null));
-    const matching = rooms.filter(room => (room.direction || "") === key);
-    if (!matching.length) zone.appendChild(h("p", {}, "教室なし"));
-    for (const room of matching) {
-      const tile = h("button", {
-        className:"layout-room",
-        "aria-pressed":String(room === selectedRoom),
-        onClick:() => {
-          mapRoomId = room.id;
-          renderPanel6();
-          document.querySelector("#layout-directions input:checked").focus();
-        }
-      }, room[mapNameMode]);
-      tile.draggable = true;
-      tile.addEventListener("dragstart", event => {
-        event.dataTransfer.setData("text/plain", String(room.id));
-      });
-      tile.addEventListener("dragover", event => event.preventDefault());
-      tile.addEventListener("drop", event => {
-        event.preventDefault();
-        const source = matching.find(item => String(item.id) === event.dataTransfer.getData("text/plain"));
-        if (!source || source === room) return;
-        const from = STATE.rooms.indexOf(source);
-        const to = STATE.rooms.indexOf(room);
-        [STATE.rooms[from], STATE.rooms[to]] = [STATE.rooms[to], STATE.rooms[from]];
-        saveAndSync();
-      });
-      zone.appendChild(tile);
+  function appendRow(room) {
+    const buildingKey = BUILDINGS.find(([key]) => room?.floor.startsWith(key))?.[0] || BUILDINGS[0][0];
+    const existingFloor = room?.floor.match(/(\d+)F$/)?.[1] || "1";
+    const oldName = h("input", {className:"inp", required:"", maxlength:"80", value:room?.old || ""});
+    const newName = h("input", {className:"inp", maxlength:"80", value:room?.nw || ""});
+    const building = schoolSelect(BUILDINGS, buildingKey);
+    const floor = h("input", {className:"inp", type:"number", min:"1", step:"1", required:"", value:existingFloor});
+    const position = h("input", {className:"inp", type:"number", min:"1", step:"1", value:eastOrder(room || {}) ?? ""});
+    const row = div("room-management-row", ...[oldName, newName, building, floor, position].map((input, i) => {
+      input.setAttribute("aria-label", fields[i]);
+      return h("label", {}, span("", fields[i]), input);
+    }));
+    const entry = {original:room && {...room}, oldName, newName, building, floor, position};
+    if (!room) {
+      row.appendChild(h("button", {className:"btn ghost room-management-cancel", type:"button", onClick:() => {
+        rows.splice(rows.indexOf(entry), 1);
+        row.remove();
+      }}, "追加を取り消す"));
     }
-    grid.appendChild(zone);
+    rows.push(entry);
+    list.appendChild(row);
+    return oldName;
   }
-  panel.appendChild(grid);
 
-  const editors = div("layout-editors");
-  const editor = h("form", {className:"layout-editor"}, h("h3", {}, selected ? "教室を編集" : "教室を追加"));
-  const oldName = h("input", {id:"layout-current-name", className:"inp", required:"", maxlength:"80", value:selected?.old || ""});
-  const newName = h("input", {className:"inp", maxlength:"80", value:selected?.nw || ""});
-  const roomFloor = mapSelect("教室の校舎・階", FLOORS.map(name => [name, name]), mapFloor);
-  const directions = h("fieldset", {id:"layout-directions", className:"layout-directions"}, h("legend", {}, "方角"));
-  const choices = div("layout-choices");
-  for (const key of ["north", "east", "south", "west", "center", ""]) {
-    const input = h("input", {type:"radio", name:"direction", value:key});
-    input.checked = key === (Object.hasOwn(MAP_DIRECTIONS, selected?.direction) ? selected.direction : "");
-    choices.appendChild(h("label", {}, input, h("span", {}, MAP_DIRECTIONS[key] || "未設定")));
-  }
-  directions.appendChild(choices);
-  editor.append(h("label", {}, "現在の教室名", oldName), h("label", {}, "来年度の教室名", newName),
-    h("label", {}, "校舎・階", roomFloor), directions,
-    div("layout-actions", h("button", {className:"btn layout-save", type:"submit"}, "教室を保存"),
-      selected ? h("button", {className:"btn ghost", type:"button", onClick:() => {
-        mapRoomId = null;
-        renderPanel6();
-        document.getElementById("layout-current-name").focus();
-      }}, "新しい教室を追加") : null));
-  oldName.addEventListener("input", () => oldName.setCustomValidity(""));
-  editor.addEventListener("submit", event => {
+  const floors = schoolFloors();
+  [...STATE.rooms].sort((a, b) => floors.indexOf(a.floor) - floors.indexOf(b.floor) ||
+    (eastOrder(a) ?? Infinity) - (eastOrder(b) ?? Infinity)).forEach(appendRow);
+
+  form.addEventListener("input", () => {
+    form.dataset.dirty = "true";
+    error.textContent = "";
+  });
+  form.addEventListener("submit", event => {
     event.preventDefault();
-    const old = oldName.value.trim();
-    if (!old) {
-      oldName.setCustomValidity("教室名を入力してください。");
-      oldName.reportValidity();
-      return;
-    }
-    const room = STATE.rooms.find(item => item.id === mapRoomId);
-    if (selected && !room) {
-      mapRoomId = null;
-      renderPanel6();
-      showToast("選んだ教室は別の端末で削除されました");
-      return;
-    }
-    const details = {old, nw:newName.value.trim() || old, floor:roomFloor.value, direction:new FormData(editor).get("direction")};
-    if (room) {
-      for (const key of Object.keys(details)) {
-        const previous = key === "direction" ? selected.direction || "" : selected[key];
-        if (details[key] !== previous) room[key] = details[key];
+    error.textContent = "";
+    const draft = new Map(STATE.rooms.map(room => [room.id, {...room}]));
+    const added = [];
+    for (const row of rows) {
+      const {original, oldName, newName, building, floor, position} = row;
+      const old = oldName.value.trim();
+      if (!old || !Number.isSafeInteger(floor.valueAsNumber) ||
+          (position.value && !Number.isSafeInteger(position.valueAsNumber))) {
+        error.textContent = "教室名を入力し、階数と順番は正の整数を指定してください。";
+        return;
       }
-    } else {
-      const id = crypto.randomUUID();
-      STATE.rooms.push({id, ...details, students:0, teacher:"", type:"normal"});
-      STATE.stocks.push(mkStock(id));
-      mapRoomId = id;
+      const values = {old, nw:newName.value.trim() || old, floor:`${building.value}${floor.valueAsNumber}F`,
+        eastOrder:position.value ? position.valueAsNumber : null};
+      if (!original) {
+        added.push({id:crypto.randomUUID(), ...values, students:0, teacher:"", type:"normal"});
+        continue;
+      }
+      const changes = Object.entries(values).filter(([key, value]) =>
+        (key === "eastOrder" ? eastOrder(original) : original[key]) !== value);
+      const current = draft.get(original.id);
+      if (changes.length && !current) {
+        error.textContent = `「${original.old}」は別の端末で削除されました。教室管理タブを開き直してください。`;
+        return;
+      }
+      for (const [key, value] of changes) {
+        if (value === null) delete current[key];
+        else current[key] = value;
+      }
     }
-    mapFloor = (room || details).floor;
+    const next = [...draft.values(), ...added];
+    const positions = new Set();
+    for (const room of next) {
+      const order = eastOrder(room);
+      if (order === null) continue;
+      const key = room.floor + "/" + order;
+      if (positions.has(key)) {
+        error.textContent = `${room.floor}の東から${order}教室目が重複しています。順番を確認してください。`;
+        return;
+      }
+      positions.add(key);
+    }
+    STATE.rooms = next;
+    STATE.stocks.push(...added.map(room => mkStock(room.id)));
     saveAndSync();
-    showToast("教室の設定を保存しました");
+    showToast("教室の変更をまとめて反映しました");
   });
-  editors.appendChild(editor);
 
-  const stairs = h("form", {className:"layout-editor"}, h("h3", {}, "階段の設定"),
-    h("p", {}, `${mapFloor}の階段の位置を選びます。すべて外して保存すると「なし」になります。`));
+  form.append(list, error, div("layout-actions",
+    h("button", {className:"btn ghost", type:"button", onClick:() => {
+      form.dataset.dirty = "true";
+      appendRow().focus();
+    }}, "＋ 教室を追加"),
+    h("button", {className:"btn layout-save", type:"submit"}, "変更を保存")));
+  panel.append(h("header", {className:"layout-heading"},
+    h("h2", {}, "教室管理"),
+    h("p", {}, "校舎・階ごとに、最も東の教室を1として入力します。順番が未確認の教室は空欄にできます。")),
+  form);
+}
+
+function renderStairSettings() {
+  const floor = schoolSelect(schoolFloors().map(name => [name, name]), stairFloor);
+  floor.addEventListener("change", () => {
+    stairFloor = floor.value;
+    renderPanel7();
+  });
+  const form = h("form", {className:"layout-editor"},
+    h("h3", {}, "階段の設定"), h("label", {}, "校舎・階", floor),
+    h("p", {}, "階段の位置を選びます。すべて外して保存すると「なし」になります。"));
   const checks = div("layout-checks");
-  for (const [key, name] of Object.entries(MAP_DIRECTIONS)) {
+  for (const [key, label] of Object.entries(STAIR_DIRECTIONS)) {
     const input = h("input", {type:"checkbox", name:key});
-    input.checked = Boolean(STATE.stairs[mapFloor]?.[key]);
-    checks.appendChild(h("label", {}, input, name));
+    input.checked = Boolean(STATE.stairs[stairFloor]?.[key]);
+    checks.appendChild(h("label", {}, input, label));
   }
-  stairs.append(h("p", {className:"layout-stair-status"}, "登録状況：" + mapStairsText(mapFloor)),
-    checks, h("button", {className:"btn layout-save", type:"submit"}, "階段を保存"));
-  stairs.addEventListener("submit", event => {
+  form.append(h("p", {}, "登録状況：" + mapStairsText(stairFloor)), checks,
+    h("button", {className:"btn layout-save", type:"submit"}, "階段を保存"));
+  form.addEventListener("input", () => form.dataset.dirty = "true");
+  form.addEventListener("submit", event => {
     event.preventDefault();
-    const values = new FormData(stairs);
-    STATE.stairs[mapFloor] = Object.fromEntries([
-      ["configured", true], ...Object.keys(MAP_DIRECTIONS).map(key => [key, values.has(key)])
+    const values = new FormData(form);
+    STATE.stairs[stairFloor] = Object.fromEntries([
+      ["configured", true], ...Object.keys(STAIR_DIRECTIONS).map(key => [key, values.has(key)])
     ]);
     saveAndSync();
     showToast("階段の設定を保存しました");
   });
-  for (const form of [editor, stairs]) {
-    form.addEventListener("input", () => form.dataset.dirty = "true");
-  }
-  editors.appendChild(stairs);
-  panel.appendChild(editors);
+  return form;
 }
 
 // ══════════════════════════════════════
@@ -932,6 +930,7 @@ function renderPanel7(){
   const btnRow=div("btn-row");
   btnRow.appendChild(h("button",{className:"btn ghost",onClick:()=>{STATE.layoutOld=INIT_LAYOUT_OLD;STATE.layoutNew=INIT_LAYOUT_NEW;saveAndSync();renderPanel7();showToast("デフォルトに戻しました");}},"デフォルトに戻す"));
   p.appendChild(btnRow);
+  p.appendChild(renderStairSettings());
 }
 
 // ══════════════════════════════════════
